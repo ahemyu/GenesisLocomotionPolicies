@@ -216,6 +216,7 @@ class Backflip(Go2):
         )
 
     def _reward_orientation_control(self):
+        # Penalize non flat base orientation
         current_time = self.episode_length_buf * self.dt
         phase = (current_time - 0.5).clamp(min=0, max=0.5)
         quat_pitch = gs_quat_from_angle_axis(4 * phase * torch.pi,

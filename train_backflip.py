@@ -146,7 +146,7 @@ def get_cfgs():
     }
     obs_cfg = {
         'num_obs': 60,
-        'num_history_obs': 3, # new
+        'num_history_obs': 1,
         'obs_noise': {
             'ang_vel': 0.1,
             'gravity': 0.02,
@@ -164,18 +164,16 @@ def get_cfgs():
     reward_cfg = {
         'soft_dof_pos_limit': 0.9,
         'reward_scales': {
-            'ang_vel_y': 10.0,  # Boost rotation
+            'ang_vel_y': 5.0,
             'ang_vel_z': -1.0,
             'lin_vel_z': 20.0,
-            'orientation_control': -5.0,  # Stronger landing focus
+            'orientation_control': -1.0,
             'feet_height_before_backflip': -30.0,
             'height_control': -10.0,
-            'actions_symmetry': -0.05,  # Less constraint
+            'actions_symmetry': -0.1,
             'gravity_y': -10.0,
-            'feet_distance': -0.05,  # Less constraint
+            'feet_distance': -1.0,
             'action_rate': -0.001,
-            'successful_landing': 100.0,  # New
-            'stabilize_before_landing': -5.0,  # New
         },
     }
     command_cfg = {
