@@ -6,7 +6,7 @@ import shutil
 
 import numpy as np
 import torch
-import wandb
+# import wandb
 from reward_wrapper import Backflip
 from locomotion_env import LocoEnv
 from rsl_rl.runners import OnPolicyRunner
@@ -146,7 +146,7 @@ def get_cfgs():
     }
     obs_cfg = {
         'num_obs': 60,
-        'num_history_obs': 1,
+        'num_history_obs': 3, # new
         'obs_noise': {
             'ang_vel': 0.1,
             'gravity': 0.02,
@@ -164,16 +164,18 @@ def get_cfgs():
     reward_cfg = {
         'soft_dof_pos_limit': 0.9,
         'reward_scales': {
-            'ang_vel_y': 5.0,
+            'ang_vel_y': 10.0,  # Boost rotation
             'ang_vel_z': -1.0,
             'lin_vel_z': 20.0,
-            'orientation_control': -1.0,
+            'orientation_control': -5.0,  # Stronger landing focus
             'feet_height_before_backflip': -30.0,
             'height_control': -10.0,
-            'actions_symmetry': -0.1,
+            'actions_symmetry': -0.05,  # Less constraint
             'gravity_y': -10.0,
-            'feet_distance': -1.0,
+            'feet_distance': -0.05,  # Less constraint
             'action_rate': -0.001,
+            'successful_landing': 100.0,  # New
+            'stabilize_before_landing': -5.0,  # New
         },
     }
     command_cfg = {
@@ -237,7 +239,7 @@ def main():
         print('==> resume training from', resume_path)
         runner.load(resume_path)
 
-    wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='offline' if args.offline else 'online')
+    # wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='offline' if args.offline else 'online')
 
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, command_cfg],
@@ -253,7 +255,13 @@ if __name__ == '__main__':
 
 '''
 # training
-python train_backflip.py -e EXP_NAME
+python train_backflip.py -e backflip -B 2000 --max-iterations 2000
+
+# resume training from last run
+python train_backflip.py -e backflip_v2 --resume backflip --ckpt 1000 -B 1000 
+
+# also resume training from this run 
+python train_backflip.py -e backflip_v3 --resume backflip_v2 --ckpt 2000 -B 2000
 
 # evaluation
 python eval_backflip.py -e EXP_NAME --ckpt NUM_CKPT
