@@ -99,8 +99,8 @@ def get_cfgs():
         'feet_link_names': ['foot'],
         'base_link_name': ['base'],
         # PD
-        'PD_stiffness': {'joint': 70.0},
-        'PD_damping': {'joint': 3.0},
+        'PD_stiffness': {'joint': 50.0},
+        'PD_damping': {'joint': 2.0},
         'use_implicit_controller': False,
         # termination
         'termination_if_roll_greater_than': 0.4,
@@ -113,10 +113,10 @@ def get_cfgs():
         'push_interval_s': -1,
         'max_push_vel_xy': 1.0,
         # time (second)
-        'episode_length_s': 2.0,
+        'episode_length_s': 3.0,
         'resampling_time_s': 4.0,
         'command_type': 'ang_vel_yaw',  # 'ang_vel_yaw' or 'heading'
-        'action_scale': 0.5,
+        'action_scale': 1.0,
         'action_latency': 0.02,
         'clip_actions': 100.0,
         'send_timeouts': True,
@@ -143,7 +143,7 @@ def get_cfgs():
         'coupling': False,
     }
     obs_cfg = {
-        'num_obs': 60,
+        'num_obs': 61,
         'num_history_obs': 1,
         'obs_noise': {
             'ang_vel': 0.1,
@@ -162,16 +162,17 @@ def get_cfgs():
     reward_cfg = {
         'soft_dof_pos_limit': 0.9,
         'reward_scales': {
-            'ang_vel_y': 5.0,
+            'ang_vel_y': 10.0,
             'ang_vel_z': -1.0,
-            'lin_vel_z': 20.0,
+            'lin_vel_z': 10.0,
             'orientation_control': -1.0,
-            'feet_height_before_backflip': -30.0,
+            'feet_height_before_frontflip': -30.0,
             'height_control': -10.0,
             'actions_symmetry': -0.1,
             'gravity_y': -10.0,
             'feet_distance': -1.0,
             'action_rate': -0.001,
+            'full_flip': 20.0,
         },
     }
     command_cfg = {
@@ -250,5 +251,5 @@ if __name__ == '__main__':
 
 '''
 # training
-python train_frontflip.py -e frontflip -B 2000
+python train_frontflip.py -e frontflip -B 2000 --max_iterations 2000
 '''

@@ -285,6 +285,11 @@ class Backflip(Go2):
         return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1)
 
 class FrontFlip(Go2):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cumulative_pitch = torch.zeros(self.num_envs, device=self.device)
+
     def reset_idx(self, envs_idx):
         if len(envs_idx) == 0:
             return
@@ -340,6 +345,8 @@ class FrontFlip(Go2):
         self.episode_length_buf[envs_idx] = 0
         self.reset_buf[envs_idx] = 1
 
+        self.cumulative_pitch[envs_idx] = 0.0 # Reset cumulative pitch
+
         # fill extras
         self.extras['episode'] = {}
         for key in self.episode_sums.keys():
@@ -351,6 +358,10 @@ class FrontFlip(Go2):
         # send timeout info to the algorithm
         if self.env_cfg['send_timeouts']:
             self.extras['time_outs'] = self.time_out_buf
+        
+    def post_physics_step(self):
+        super().post_physics_step()
+        self.cumulative_pitch += self.base_ang_vel[:, 1] * self.dt
 
     def compute_observations(self):
         phase = torch.pi * self.episode_length_buf[:, None] * self.dt / 2
@@ -368,6 +379,7 @@ class FrontFlip(Go2):
                 torch.cos(phase / 2),
                 torch.sin(phase / 4),
                 torch.cos(phase / 4),
+                self.cumulative_pitch.unsqueeze(-1) * 0.25,
             ],
             axis=-1,
         )
@@ -419,8 +431,9 @@ class FrontFlip(Go2):
     
     def _reward_ang_vel_y(self):
         current_time = self.episode_length_buf * self.dt
-        ang_vel = self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2)  # Changed from -self to +self for frontflip
-        return ang_vel * torch.logical_and(current_time > 0.5, current_time < 1.0)
+        in_air = self.base_pos[:, 2] > 0.2  # Only reward when airborne
+        ang_vel = (-self.base_ang_vel[:, 1]).clamp(min=0, max=15.0)  # Reward negative velocity up to 15 rad/s
+        return ang_vel * in_air * torch.logical_and(current_time > 0.3, current_time < 1.5)  # Extended window
 
     def _reward_ang_vel_z(self):
         return torch.abs(self.base_ang_vel[:, 2])
@@ -433,8 +446,8 @@ class FrontFlip(Go2):
     def _reward_height_control(self):
         # Penalize non flat base orientation
         current_time = self.episode_length_buf * self.dt
-        target_height = 0.3
-        height_diff = torch.square(target_height - self.base_pos[:, 2]) * torch.logical_or(current_time < 0.4, current_time > 1.4)
+        target_height = 0.5  # Higher for more airtime
+        height_diff = torch.square(target_height - self.base_pos[:, 2]) * torch.logical_or(current_time < 0.2, current_time > 1.5)
         return height_diff
 
     def _reward_actions_symmetry(self):
@@ -470,3 +483,8 @@ class FrontFlip(Go2):
         # Penalize collisions on selected bodies
         current_time = self.episode_length_buf * self.dt
         return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1)
+    
+    def _reward_full_flip(self):
+        target_pitch = -2 * 3.14159  # Negative for front flip
+        error = torch.abs(self.cumulative_pitch - target_pitch) # TODO: doesn't exist
+        return 20.0 * torch.exp(-error / 0.5)
