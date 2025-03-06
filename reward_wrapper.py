@@ -286,15 +286,10 @@ class Backflip(Go2):
 
 class FrontFlip(Go2):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cumulative_pitch = torch.zeros(self.num_envs, device=self.device)
-
     def reset_idx(self, envs_idx):
         if len(envs_idx) == 0:
             return
 
-        # reset dofs
         self.dof_pos[envs_idx] = self.default_dof_pos
         self.dof_vel[envs_idx] = 0.0
         self.robot.set_dofs_position(
@@ -304,7 +299,6 @@ class FrontFlip(Go2):
             envs_idx=envs_idx,
         )
 
-        # reset root states - position
         self.base_pos[envs_idx] = self.base_init_pos
         self.base_pos[envs_idx, 2] = 0.32
         self.base_quat[envs_idx] = self.base_init_quat.reshape(1, -1)
@@ -316,13 +310,11 @@ class FrontFlip(Go2):
         )
         self.robot.zero_all_dofs_velocity(envs_idx)
 
-        # update projected gravity
         inv_base_quat = gs_inv_quat(self.base_quat)
         self.projected_gravity = gs_transform_by_quat(
             self.global_gravity, inv_base_quat
         )
 
-        # reset root states - velocity
         self.base_lin_vel[envs_idx] = 0
         self.base_ang_vel[envs_idx] = 0
         base_vel = torch.concat(
@@ -334,7 +326,6 @@ class FrontFlip(Go2):
 
         self._resample_commands(envs_idx)
 
-        # reset buffers
         self.obs_history_buf[envs_idx] = 0.0
         self.actions[envs_idx] = 0.0
         self.last_actions[envs_idx] = 0.0
@@ -345,9 +336,6 @@ class FrontFlip(Go2):
         self.episode_length_buf[envs_idx] = 0
         self.reset_buf[envs_idx] = 1
 
-        self.cumulative_pitch[envs_idx] = 0.0 # Reset cumulative pitch
-
-        # fill extras
         self.extras['episode'] = {}
         for key in self.episode_sums.keys():
             self.extras['episode']['rew_' + key] = (
@@ -355,31 +343,25 @@ class FrontFlip(Go2):
                 / self.max_episode_length_s
             )
             self.episode_sums[key][envs_idx] = 0.0
-        # send timeout info to the algorithm
         if self.env_cfg['send_timeouts']:
             self.extras['time_outs'] = self.time_out_buf
-        
-    def post_physics_step(self):
-        super().post_physics_step()
-        self.cumulative_pitch += self.base_ang_vel[:, 1] * self.dt
 
     def compute_observations(self):
         phase = torch.pi * self.episode_length_buf[:, None] * self.dt / 2
         self.obs_buf = torch.cat(
             [
-                self.base_ang_vel * self.obs_scales['ang_vel'],                     # 3
-                self.projected_gravity,                                             # 3
-                (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'], # 10
-                self.dof_vel * self.obs_scales['dof_vel'],                          # 10
-                self.actions,                                                       # 10
-                self.last_actions,                                                  # 10
+                self.base_ang_vel * self.obs_scales['ang_vel'],
+                self.projected_gravity,
+                (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'],
+                self.dof_vel * self.obs_scales['dof_vel'],
+                self.actions,
+                self.last_actions,
                 torch.sin(phase),
                 torch.cos(phase),
                 torch.sin(phase / 2),
                 torch.cos(phase / 2),
                 torch.sin(phase / 4),
                 torch.cos(phase / 4),
-                self.cumulative_pitch.unsqueeze(-1) * 0.25,
             ],
             axis=-1,
         )
@@ -415,10 +397,9 @@ class FrontFlip(Go2):
         )
 
     def _reward_orientation_control(self):
-        # Penalize non flat base orientation
         current_time = self.episode_length_buf * self.dt
         phase = (current_time - 0.5).clamp(min=0, max=0.5)
-        quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi,  # Changed from 4 to -4 for frontflip
+        quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi,
                                              torch.tensor([0, 1, 0], device=self.device, dtype=torch.float))
 
         desired_base_quat = gs_quat_mul(quat_pitch, self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1))
@@ -428,12 +409,11 @@ class FrontFlip(Go2):
         orientation_diff = torch.sum(torch.square(self.projected_gravity - desired_projected_gravity), dim=1)
 
         return orientation_diff
-    
+
     def _reward_ang_vel_y(self):
         current_time = self.episode_length_buf * self.dt
-        in_air = self.base_pos[:, 2] > 0.2  # Only reward when airborne
-        ang_vel = (-self.base_ang_vel[:, 1]).clamp(min=0, max=15.0)  # Reward negative velocity up to 15 rad/s
-        return ang_vel * in_air * torch.logical_and(current_time > 0.3, current_time < 1.5)  # Extended window
+        ang_vel = self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2)
+        return ang_vel * torch.logical_and(current_time > 0.5, current_time < 1.0)
 
     def _reward_ang_vel_z(self):
         return torch.abs(self.base_ang_vel[:, 2])
@@ -444,10 +424,9 @@ class FrontFlip(Go2):
         return lin_vel * torch.logical_and(current_time > 0.5, current_time < 0.75)
 
     def _reward_height_control(self):
-        # Penalize non flat base orientation
         current_time = self.episode_length_buf * self.dt
-        target_height = 0.5  # Higher for more airtime
-        height_diff = torch.square(target_height - self.base_pos[:, 2]) * torch.logical_or(current_time < 0.2, current_time > 1.5)
+        target_height = 0.3
+        height_diff = torch.square(target_height - self.base_pos[:, 2]) * torch.logical_or(current_time < 0.4, current_time > 1.4)
         return height_diff
 
     def _reward_actions_symmetry(self):
@@ -456,7 +435,7 @@ class FrontFlip(Go2):
         actions_diff += torch.square(self.actions[:, 6] + self.actions[:, 9])
         actions_diff += torch.square(self.actions[:, 7:9] - self.actions[:, 10:12]).sum(dim=-1)
         return actions_diff
-    
+
     def _reward_gravity_y(self):
         return torch.square(self.projected_gravity[:, 1])
 
@@ -466,25 +445,19 @@ class FrontFlip(Go2):
         footsteps_in_body_frame = torch.zeros(self.num_envs, 4, 3, device=self.device)
         for i in range(4):
             footsteps_in_body_frame[:, i, :] = gs_quat_apply(gs_quat_conjugate(self.base_quat),
-                                                                 cur_footsteps_translated[:, i, :])
+                                                             cur_footsteps_translated[:, i, :])
 
-        stance_width = 0.3 * torch.zeros([self.num_envs, 1,], device=self.device)
+        stance_width = 0.3 * torch.zeros([self.num_envs, 1], device=self.device)
         desired_ys = torch.cat([stance_width / 2, -stance_width / 2, stance_width / 2, -stance_width / 2], dim=1)
         stance_diff = torch.square(desired_ys - footsteps_in_body_frame[:, :, 1]).sum(dim=1)
-        
+
         return stance_diff
 
-    def _reward_feet_height_before_frontflip(self):
+    def _reward_feet_height_before_backflip(self):
         current_time = self.episode_length_buf * self.dt
         foot_height = (self.foot_positions[:, :, 2]).view(self.num_envs, -1) - 0.02
         return foot_height.clamp(min=0).sum(dim=1) * (current_time < 0.5)
 
     def _reward_collision(self):
-        # Penalize collisions on selected bodies
         current_time = self.episode_length_buf * self.dt
-        return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1)
-    
-    def _reward_full_flip(self):
-        target_pitch = -2 * 3.14159  # Negative for front flip
-        error = torch.abs(self.cumulative_pitch - target_pitch) # TODO: doesn't exist
-        return 20.0 * torch.exp(-error / 0.5)
+        return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1) 
