@@ -158,18 +158,16 @@ def get_cfgs():
     'soft_dof_pos_limit': 0.9,
         'reward_scales': {
             'ang_vel_y': 10.0,
-            'ang_vel_z': -5.0,              # Increased from -1.0
+            'ang_vel_z': -1.0,              
             'lin_vel_z': 20.0,
-            'orientation_control': -2.0,    # Increased from -1.0
-            'feet_height_before_backflip': -30.0,
+            'orientation_control': -1.0,
+            'feet_height_before_frontflip': -30.0,
             'height_control': -10.0,
             'actions_symmetry': -0.1,
-            'gravity_y': -20.0,             # Increased from -10.0
+            'gravity_y': -10.0,           
             'feet_distance': -1.0,
             'action_rate': -0.001,
-            'feet_height_after_flip': -20.0,  # Increased from -10.0
-            'feet_contact_after_flip': 10.0,  # Increased from 5.0
-            'collision': -10.0,             # New
+            'collision': -10.0, # New
         },
 }
     command_cfg = {
@@ -246,5 +244,5 @@ if __name__ == '__main__':
     main()
 
 '''
-python train_frontflip.py -e frontflip_v4  -B 20000
+python train_frontflip.py -e frontflip_v5  -B 20000
 '''

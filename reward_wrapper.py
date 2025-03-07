@@ -404,7 +404,7 @@ class FrontFlip(Go2):
         current_time = self.episode_length_buf * self.dt
         phase = (current_time - 0.5).clamp(min=0, max=0.5)
         quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi,
-                                            torch.tensor([0, 1, 0], device=self.device, dtype=torch.float))
+                                             torch.tensor([0, 1, 0], device=self.device, dtype=torch.float))
 
         desired_base_quat = gs_quat_mul(quat_pitch, self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1))
         inv_desired_base_quat = gs_inv_quat(desired_base_quat)
@@ -441,9 +441,10 @@ class FrontFlip(Go2):
         """Penalizes base height deviation from target (0.3m) before takeoff and after landing (before 0.4 and after 1.0 seconds).
         
         Maintains a stable standing height before the flip and ensures the robot lands upright without collapsing."""
+
         current_time = self.episode_length_buf * self.dt
         target_height = 0.3
-        height_diff = torch.square(target_height - self.base_pos[:, 2]) * torch.logical_or(current_time < 0.4, current_time > 1.0)
+        height_diff = torch.square(target_height - self.base_pos[:, 2]) * torch.logical_or(current_time < 0.4, current_time > 1.4)
         return height_diff
 
     def _reward_actions_symmetry(self):
@@ -471,7 +472,7 @@ class FrontFlip(Go2):
         footsteps_in_body_frame = torch.zeros(self.num_envs, 4, 3, device=self.device)
         for i in range(4):
             footsteps_in_body_frame[:, i, :] = gs_quat_apply(gs_quat_conjugate(self.base_quat),
-                                                            cur_footsteps_translated[:, i, :])
+                                                             cur_footsteps_translated[:, i, :])
 
         stance_width = 0.3 * torch.zeros([self.num_envs, 1], device=self.device)
         desired_ys = torch.cat([stance_width / 2, -stance_width / 2, stance_width / 2, -stance_width / 2], dim=1)
@@ -479,7 +480,7 @@ class FrontFlip(Go2):
 
         return stance_diff
 
-    def _reward_feet_height_before_backflip(self):
+    def _reward_feet_height_before_frontflip(self):
         """Penalizes feet lifting off the ground before the flip (before 0.5 seconds).
         
         Ensures the robot remains grounded and stable during the preparation phase before initiating the frontflip."""
@@ -492,23 +493,4 @@ class FrontFlip(Go2):
         
         Prevents the robot from crashing or landing on its base/body, encouraging a clean flip and feet-first landing."""
         current_time = self.episode_length_buf * self.dt
-        return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1)
-
-    def _reward_feet_height_after_flip(self):
-        """Penalizes feet being too high above the ground after the flip (after 1.0 seconds).
-        
-        Encourages the robot to extend its legs downward post-flip to prepare for a proper landing on its feet."""
-        current_time = self.episode_length_buf * self.dt
-        foot_heights = self.foot_positions[:, :, 2] - 0.02  # Ground level assumed at z=0.02
-        height_penalty = torch.sum(torch.clamp(foot_heights, min=0), dim=1) * (current_time > 1.0)
-        return height_penalty
-
-    def _reward_feet_contact_after_flip(self):
-        """Rewards feet making contact with the ground after the flip (after 1.2 seconds).
-        
-        Reinforces a successful landing by rewarding each foot in contact, ensuring the robot lands on its legs."""
-        current_time = self.episode_length_buf * self.dt
-        contact = self.link_contact_forces[:, self.feet_link_indices, 2] > 1.0  # z-direction force threshold
-        contact_reward = torch.sum(contact, dim=1) * (current_time > 1.3)
-        return contact_reward
-    
+        return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1) 
