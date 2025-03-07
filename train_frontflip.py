@@ -157,7 +157,7 @@ def get_cfgs():
     reward_cfg = {
         'soft_dof_pos_limit': 0.9,
         'reward_scales': {
-            'ang_vel_y': 7.5, #increased from 5.0
+            'ang_vel_y': 10.0, #increased from 5.0
             'ang_vel_z': -1.0,
             'lin_vel_z': 20.0,
             'orientation_control': -1.0,
@@ -167,8 +167,6 @@ def get_cfgs():
             'gravity_y': -10.0,
             'feet_distance': -1.0,
             'action_rate': -0.001,
-            'upside_down': 10.0,
-            'leg_tuck': -2.0,
         },
     }
     command_cfg = {

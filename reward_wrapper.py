@@ -398,37 +398,22 @@ class FrontFlip(Go2):
 
     def _reward_orientation_control(self):
         current_time = self.episode_length_buf * self.dt
-        phase = (current_time - 0.4).clamp(min=0, max=0.6)  # Start at 0.4s, end at 1.0s (0.6s duration)
-        quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi / 0.6, 
-                                            torch.tensor([0, 1, 0], device=self.device, dtype=torch.float))
-        desired_quat = gs_quat_mul(quat_pitch, self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1))
-        
-        # Compute quaternion difference: q_diff = current_quat * inverse(desired_quat)
-        inv_desired_quat = gs_inv_quat(desired_quat)
-        quat_diff = gs_quat_mul(self.base_quat, inv_desired_quat)
-        
-        # Extract the scalar part (w) to compute the angular difference
-        # For a quaternion [w, x, y, z], the angle of rotation is 2 * acos(w)
-        w = quat_diff[:, 0].clamp(min=-1.0, max=1.0)  # Ensure valid range for acos
-        angle_diff = 2 * torch.acos(w)  # Angle in radians
-        
-        # Penalize the squared angular difference
-        return torch.square(angle_diff)
+        phase = (current_time - 0.5).clamp(min=0, max=0.5)
+        quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi,
+                                             torch.tensor([0, 1, 0], device=self.device, dtype=torch.float))
 
-    def _reward_upside_down(self):
-        current_time = self.episode_length_buf * self.dt
-        target_time = 0.65  # Around halfway through the flip
-        time_window = 0.15  # Wider window to encourage passing through this point
-        in_window = torch.logical_and(current_time > target_time - time_window, current_time < target_time + time_window)
-        desired_projected_gravity = torch.tensor([0, 0, 1], device=self.device, dtype=torch.float)  # Upside down
+        desired_base_quat = gs_quat_mul(quat_pitch, self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1))
+        inv_desired_base_quat = gs_inv_quat(desired_base_quat)
+        desired_projected_gravity = gs_transform_by_quat(self.global_gravity, inv_desired_base_quat)
+
         orientation_diff = torch.sum(torch.square(self.projected_gravity - desired_projected_gravity), dim=1)
-        reward = torch.exp(-orientation_diff / 0.1) * in_window
-        return reward
+
+        return orientation_diff
 
     def _reward_ang_vel_y(self):
         current_time = self.episode_length_buf * self.dt
-        ang_vel = self.base_ang_vel[:, 1].clamp(min=0, max=20)  # Increased from 15 to 20 rad/s
-        return ang_vel * torch.logical_and(current_time > 0.4, current_time < 1.1)  # Adjusted window: 0.4 to 1.1 seconds
+        ang_vel = self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2)
+        return ang_vel * torch.logical_and(current_time > 0.5, current_time < 1.0)
 
     def _reward_ang_vel_z(self):
         return torch.abs(self.base_ang_vel[:, 2])
@@ -476,11 +461,3 @@ class FrontFlip(Go2):
     def _reward_collision(self):
         current_time = self.episode_length_buf * self.dt
         return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1) 
-    
-    def _reward_leg_tuck(self):
-        current_time = self.episode_length_buf * self.dt
-        tuck_window = torch.logical_and(current_time > 0.4, current_time < 1.1)  # Match angular velocity window
-        thigh_angles = self.dof_pos[:, [1, 4, 7, 10]]  # Thigh joints (verify indices)
-        calf_angles = self.dof_pos[:, [2, 5, 8, 11]]  # Calf joints (verify indices)
-        tuck_reward = torch.sum(torch.square(thigh_angles), dim=1) + torch.sum(torch.square(calf_angles), dim=1)
-        return -2.0 * tuck_reward * tuck_window  # Increased scale factor from -1.0 to -2.0
