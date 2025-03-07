@@ -157,18 +157,19 @@ def get_cfgs():
     reward_cfg = {
     'soft_dof_pos_limit': 0.9,
         'reward_scales': {
-            'ang_vel_y': 10.0,              # Encourage forward rotation during flip
-            'ang_vel_z': -1.0,              # Penalize z-axis angular velocity
-            'lin_vel_z': 20.0,              # Encourage upward velocity during takeoff
-            'orientation_control': -1.0,    # Penalize orientation deviation
-            'feet_height_before_backflip': -30.0,  # Keep feet grounded before flip
-            'height_control': -10.0,        # Penalize base height deviation
-            'actions_symmetry': -0.1,       # Encourage symmetric actions
-            'gravity_y': -10.0,             # Penalize roll
-            'feet_distance': -1.0,          # Maintain stance width
-            'action_rate': -0.001,          # Penalize rapid action changes
-            'feet_height_after_flip': -10.0,  # New: Penalize high feet after flip
-            'feet_contact_after_flip': 5.0,   # New: Reward feet contact after flip
+            'ang_vel_y': 10.0,
+            'ang_vel_z': -5.0,              # Increased from -1.0
+            'lin_vel_z': 20.0,
+            'orientation_control': -2.0,    # Increased from -1.0
+            'feet_height_before_backflip': -30.0,
+            'height_control': -10.0,
+            'actions_symmetry': -0.1,
+            'gravity_y': -20.0,             # Increased from -10.0
+            'feet_distance': -1.0,
+            'action_rate': -0.001,
+            'feet_height_after_flip': -20.0,  # Increased from -10.0
+            'feet_contact_after_flip': 10.0,  # Increased from 5.0
+            'collision': -10.0,             # New
         },
 }
     command_cfg = {

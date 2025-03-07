@@ -509,6 +509,6 @@ class FrontFlip(Go2):
         Reinforces a successful landing by rewarding each foot in contact, ensuring the robot lands on its legs."""
         current_time = self.episode_length_buf * self.dt
         contact = self.link_contact_forces[:, self.feet_link_indices, 2] > 1.0  # z-direction force threshold
-        contact_reward = torch.sum(contact, dim=1) * (current_time > 1.2)
+        contact_reward = torch.sum(contact, dim=1) * (current_time > 1.3)
         return contact_reward
     
