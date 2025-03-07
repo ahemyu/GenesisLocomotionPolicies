@@ -245,5 +245,5 @@ if __name__ == '__main__':
     main()
 
 '''
-python train_frontflip.py -e frontflip_v2  -B 30000
+python train_frontflip.py -e frontflip_v2  -B 20000
 '''
