@@ -1,16 +1,9 @@
 import argparse
-import copy
 import os
 import pickle
 import shutil
-
-import numpy as np
-import torch
-# import wandb
 from reward_wrapper import Backflip
-from locomotion_env import LocoEnv
 from rsl_rl.runners import OnPolicyRunner
-
 import genesis as gs
 
 

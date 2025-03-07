@@ -1,16 +1,9 @@
 import argparse
-import copy
 import os
 import pickle
 import shutil
-
-import numpy as np
-import torch
-# import wandb
 from reward_wrapper import FrontFlip
-from locomotion_env import LocoEnv
 from rsl_rl.runners import OnPolicyRunner
-
 import genesis as gs
 
 
@@ -164,7 +157,7 @@ def get_cfgs():
     reward_cfg = {
         'soft_dof_pos_limit': 0.9,
         'reward_scales': {
-            'ang_vel_y': 5.0,
+            'ang_vel_y': 7.5, #increased from 5.0
             'ang_vel_z': -1.0,
             'lin_vel_z': 20.0,
             'orientation_control': -1.0,
@@ -174,6 +167,8 @@ def get_cfgs():
             'gravity_y': -10.0,
             'feet_distance': -1.0,
             'action_rate': -0.001,
+            'upside_down': 10.0,
+            'leg_tuck': -2.0,
         },
     }
     command_cfg = {
@@ -237,7 +232,6 @@ def main():
         print('==> resume training from', resume_path)
         runner.load(resume_path)
 
-    # wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='offline' if args.offline else 'online')
 
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, command_cfg],
@@ -249,3 +243,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+'''
+python train_frontflip.py -e frontflip_v2  -B 30000
+'''
