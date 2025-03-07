@@ -1,0 +1,26 @@
+################################################################################
+                      Learning iteration 999/1000                       
+
+                       Computation: 460627 steps/s (collection: 0.740s, learning 0.303s)
+               Value function loss: 0.3324
+                    Surrogate loss: -0.0003
+             Mean action noise std: 0.81
+                       Mean reward: 33.19
+               Mean episode length: 101.00
+        Mean episode rew_ang_vel_y: 16.3995
+        Mean episode rew_ang_vel_z: -0.9741
+        Mean episode rew_lin_vel_z: 2.6307
+Mean episode rew_orientation_control: -0.7527
+Mean episode rew_feet_height_before_backflip: -0.3607
+   Mean episode rew_height_control: -0.1044
+ Mean episode rew_actions_symmetry: -1.4162
+        Mean episode rew_gravity_y: -0.7541
+    Mean episode rew_feet_distance: -0.1723
+      Mean episode rew_action_rate: -0.0275
+Mean episode rew_feet_height_after_flip: -0.8634
+Mean episode rew_feet_contact_after_flip: 3.0441
+--------------------------------------------------------------------------------
+                   Total timesteps: 480000000
+                    Iteration time: 1.04s
+                        Total time: 1278.65s
+                               ETA: 1.3s
