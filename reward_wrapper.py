@@ -1,7 +1,4 @@
-import numpy as np
 import torch
-
-import genesis as gs
 from locomotion_env import *
 
 class Go2(LocoEnv):

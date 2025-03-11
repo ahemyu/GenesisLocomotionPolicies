@@ -157,7 +157,7 @@ def get_cfgs():
     reward_cfg = {
     'soft_dof_pos_limit': 0.9,
         'reward_scales': {
-            'ang_vel_y': 10.0,
+            'ang_vel_y': 20.0,
             'ang_vel_z': -1.0,              
             'lin_vel_z': 20.0,
             'orientation_control': -1.0,
@@ -244,5 +244,5 @@ if __name__ == '__main__':
     main()
 
 '''
-python train_frontflip.py -e frontflip_v5  -B 20000
+python train_frontflip.py -e frontflip_v8  -B 20000
 '''
