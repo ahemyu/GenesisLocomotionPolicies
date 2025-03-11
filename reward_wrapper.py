@@ -400,7 +400,7 @@ class FrontFlip(Go2):
         and return to the initial upright orientation, ensuring a controlled flip and stable landing preparation."""
         current_time = self.episode_length_buf * self.dt
         phase = (current_time - 0.5).clamp(min=0, max=0.5)
-        quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi,
+        quat_pitch = gs_quat_from_angle_axis(4 * phase * torch.pi,
                                              torch.tensor([0, 1, 0], device=self.device, dtype=torch.float))
 
         desired_base_quat = gs_quat_mul(quat_pitch, self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1))

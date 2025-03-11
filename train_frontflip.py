@@ -167,7 +167,7 @@ def get_cfgs():
             'gravity_y': -10.0,           
             'feet_distance': -1.0,
             'action_rate': -0.001,
-            'collision': -10.0, # New
+            'collision': -10.0,
         },
 }
     command_cfg = {
@@ -244,5 +244,5 @@ if __name__ == '__main__':
     main()
 
 '''
-python train_frontflip.py -e frontflip_v8  -B 20000
+python train_frontflip.py -e frontflip_will_fail  -B 20000
 '''
