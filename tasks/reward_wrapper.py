@@ -229,7 +229,7 @@ class Backflip(Go2):
     
     def _reward_ang_vel_y(self):
         current_time = self.episode_length_buf * self.dt
-        ang_vel = -self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2)
+        ang_vel = -self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2) #negative because backflip
         return ang_vel * torch.logical_and(current_time > 0.5, current_time < 1.0)
 
     def _reward_ang_vel_z(self):
@@ -417,7 +417,7 @@ class FrontFlip(Go2):
         Promotes the rotational motion necessary for the frontflip by rewarding positive y-axis angular velocity,
         capped to prevent excessive spinning."""
         current_time = self.episode_length_buf * self.dt
-        ang_vel = self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2)
+        ang_vel = self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2) #positive because frontflip
         return ang_vel * torch.logical_and(current_time > 0.5, current_time < 1.0)
 
     def _reward_ang_vel_z(self):
