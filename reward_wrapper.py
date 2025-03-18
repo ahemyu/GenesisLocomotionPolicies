@@ -512,9 +512,7 @@ class WalkUneven(Go2):
         Resets the environments with the given indices.
         Places the robot at the start of the terrain facing the direction of the stairs.
         """
-        logger.info(f"Resetting environments for indices: {envs_idx}")
         if len(envs_idx) == 0:
-            logger.info("No environments to reset")
             return
 
         # reset dofs to default positions with slight randomization
@@ -527,7 +525,6 @@ class WalkUneven(Go2):
             envs_idx=envs_idx,
         )
 
-        logger.info("Setting initial positions and orientations")
         # reset root states - position
         # Place at beginning of terrain with some randomization in y-direction
         terrain_start_x = 2.0  # Start slightly into the terrain
@@ -540,13 +537,12 @@ class WalkUneven(Go2):
         
         # Apply slight random rotation for robustness
         base_euler = gs_rand_float(-0.1, 0.1, (len(envs_idx), 3), self.device)
-        base_euler[:, 2] = gs_rand_float(-0.2, 0.2, (len(envs_idx),), self.device) # yaw variation
+        base_euler[:, 2] = gs_rand_float(-0.2, 0.2, (len(envs_idx),), self.device)  # yaw variation
         self.base_quat[envs_idx] = gs_quat_mul(
             gs_euler2quat(base_euler),
             self.base_quat[envs_idx],
         )
         
-        logger.info("Updating robot state")
         self.robot.set_pos(
             self.base_pos[envs_idx], zero_velocity=False, envs_idx=envs_idx
         )
@@ -571,14 +567,13 @@ class WalkUneven(Go2):
             velocity=base_vel, dofs_idx_local=[0, 1, 2, 3, 4, 5], envs_idx=envs_idx
         )
 
-        logger.info("Resetting commands and buffers")
         # Set commands - primarily forward movement with slight turning ability
         self._resample_commands(envs_idx)
         
         # Constrain the commands to focus on forward motion
         self.commands[envs_idx, 0] = torch.clamp(self.commands[envs_idx, 0], 0.5, 1.0)  # Forward velocity
-        self.commands[envs_idx, 1] *= 0.3 # Reduce lateral velocity
-        self.commands[envs_idx, 2] *= 0.3 # Reduce turning
+        self.commands[envs_idx, 1] *= 0.3  # Reduce lateral velocity
+        self.commands[envs_idx, 2] *= 0.3  # Reduce turning
 
         # reset buffers
         self.obs_history_buf[envs_idx] = 0.0
@@ -605,14 +600,11 @@ class WalkUneven(Go2):
         if self.env_cfg['send_timeouts']:
             self.extras['time_outs'] = self.time_out_buf
 
-        logger.info("Reset completed")
-
     def compute_observations(self):
         """
         Compute observations including terrain height information to help the robot
         understand the terrain ahead.
         """
-        logger.info("Computing observations")
         # Get terrain height information ahead of the robot
         terrain_heights_ahead = self._get_terrain_heights_ahead()
         
@@ -654,20 +646,17 @@ class WalkUneven(Go2):
                     self.dof_vel * self.obs_scales['dof_vel'],                          # 12
                     self.actions,                                                       # 12
                     self.last_actions,                                                  # 12
-                    terrain_heights_ahead,                                             # terrain heights ahead
-                    self.base_pos,                                                     # global position
+                    terrain_heights_ahead,                                             #  terrain heights ahead
+                    self.base_pos,                                                     #  global position
                 ],
                 dim=-1,
             )
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
-        logger.info("Observations computed")
-
     def _get_terrain_heights_ahead(self):
         """
         Sample terrain heights in front of the robot to help it anticipate the terrain.
         """
-        logger.info("Getting terrain heights ahead")
         # Number of samples ahead to look
         n_samples = 5
         
@@ -697,7 +686,6 @@ class WalkUneven(Go2):
             height_field_ids.clamp(min=0)
             terrain_heights[:, i] = self.height_field[height_field_ids[:, 0], height_field_ids[:, 1]]
         
-        logger.info("Terrain heights calculated")
         return terrain_heights
 
     def check_termination(self):
@@ -705,7 +693,6 @@ class WalkUneven(Go2):
         Check if episodes should terminate.
         Additional termination conditions for uneven terrain navigation.
         """
-        logger.info("Checking termination conditions")
         # Basic termination conditions from Go2
         self.reset_buf = torch.any(
             torch.norm(
@@ -747,37 +734,29 @@ class WalkUneven(Go2):
         # Apply termination
         self.reset_buf |= self.time_out_buf
         
-        logger.info("Termination check completed")
-
     def post_physics_step(self):
         """
         Update buffers and track progress after each physics step.
         """
-        logger.info("Running post physics step")
         # Update basic buffers from parent class
         super().post_physics_step()
         
         # Update progress tracking
         self.progress_buf = self.base_pos[:, 0] / self.terrain_margin[0]
-        
-        logger.info("Post physics step completed")
-
+    
     # REWARD FUNCTIONS
+
     def _reward_forward_progress(self):
         """
         Reward forward progress along the x-axis (direction of the terrain).
         """
-        logger.info("Calculating forward progress reward")
-        reward = self.base_lin_vel[:, 0]
-        logger.info("Forward progress reward calculated")
-        return reward
+        return self.base_lin_vel[:, 0]
     
     def _reward_terrain_adaptation(self):
         """
         Reward the robot for adapting its gait to the terrain height.
         Measured by how well the base height follows the terrain height.
         """
-        logger.info("Calculating terrain adaptation reward")
         local_terrain_height = self.terrain_heights
         target_height_offset = 0.4  # Desired height above terrain
         
@@ -786,24 +765,21 @@ class WalkUneven(Go2):
             (self.base_pos[:, 2] - local_terrain_height) - target_height_offset
         )
         
-        logger.info("Terrain adaptation reward calculated")
         return height_adaptation
     
     def _reward_balance_on_slope(self):
         """
         Reward maintaining proper orientation relative to the terrain slope.
         """
-        logger.info("Calculating balance on slope reward")
-        reward = torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
-        logger.info("Balance on slope reward calculated")
-        return reward
+        # For simplicity, we'll use projected gravity as our measure of orientation
+        # Ideally on a slope, the z component should remain dominant
+        return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
     
     def _reward_foot_clearance(self):
         """
         Reward lifting feet high enough to clear stairs during swing phase,
         but not excessively high (energy efficiency).
         """
-        logger.info("Calculating foot clearance reward")
         # Calculate foot heights during swing phase
         foot_heights = 0.0
         foot_contacts = self.link_contact_forces[:, self.feet_link_indices, 2] > 1.0
@@ -824,7 +800,6 @@ class WalkUneven(Go2):
             
             foot_heights = torch.sum(too_low, dim=1) + torch.sum(too_high, dim=1)
         
-        logger.info("Foot clearance reward calculated")
         return foot_heights
     
     def _reward_gait_stability(self):
@@ -832,11 +807,9 @@ class WalkUneven(Go2):
         Reward stable gait patterns especially when on stairs.
         Measured by consistency of foot contact timing and base velocity.
         """
-        logger.info("Calculating gait stability reward")
         # Penalize velocity fluctuations
         vel_consistency = torch.sum(torch.square(self.base_lin_vel - self.last_root_vel), dim=1)
         
-        logger.info("Gait stability reward calculated")
         return vel_consistency
     
     def _reward_energy_efficiency(self):
@@ -844,7 +817,6 @@ class WalkUneven(Go2):
         Reward energy-efficient locomotion.
         Measured by minimizing joint torques and jerky movements.
         """
-        logger.info("Calculating energy efficiency reward")
         # Sum of squared torques (power usage)
         torque_penalty = torch.sum(torch.square(self.torques), dim=1)
         
@@ -853,7 +825,6 @@ class WalkUneven(Go2):
             torch.square((self.dof_vel - 2*self.last_dof_vel)), dim=1
         )
         
-        logger.info("Energy efficiency reward calculated")
         return torque_penalty + 0.1 * jerk_penalty
     
     def _reward_foot_slip(self):
@@ -861,7 +832,6 @@ class WalkUneven(Go2):
         Penalize foot slippage, which is especially important on stairs.
         Measured by horizontal movement of feet during stance phase.
         """
-        logger.info("Calculating foot slip reward")
         # Identify feet in contact with ground (stance phase)
         foot_contacts = self.link_contact_forces[:, self.feet_link_indices, 2] > 1.0
         
@@ -874,5 +844,4 @@ class WalkUneven(Go2):
             # Penalize horizontal velocity for feet in contact
             foot_slip = torch.sum(foot_vel_horizontal * foot_contacts, dim=1)
         
-        logger.info("Foot slip reward calculated")
         return foot_slip
