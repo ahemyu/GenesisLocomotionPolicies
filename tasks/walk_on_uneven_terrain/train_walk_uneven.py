@@ -3,7 +3,6 @@ import os
 import pickle
 import shutil
 
-import wandb
 from tasks.reward_wrapper import Go2
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
@@ -250,7 +249,6 @@ def main():
         print('==> resume training from', resume_path)
         runner.load(resume_path)
 
-    wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='offline' if args.offline else 'online')
 
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, command_cfg],
@@ -264,5 +262,5 @@ if __name__ == '__main__':
     main()
 
 '''
-python -m tasks.frontflip.train_walk_uneven_cpu --exp_name test
+python -m tasks.walk_on_uneven_terrain.train_walk_uneven --exp_name test -B 20000 --max_iterations 100
 '''
