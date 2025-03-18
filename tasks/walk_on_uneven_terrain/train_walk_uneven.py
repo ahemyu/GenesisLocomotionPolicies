@@ -3,7 +3,7 @@ import os
 import pickle
 import shutil
 
-from tasks.reward_wrapper import Go2
+from tasks.reward_wrapper import WalkUneven
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
 
@@ -46,7 +46,7 @@ def get_train_cfg(args):
             'resume_path': None,
             'run_name': '',
             'runner_class_name': 'runner_class_name',
-            'save_interval': 100,
+            'save_interval': 50, #save more frequently to see if we make progress earlier
         },
         'runner_class_name': 'OnPolicyRunner',
         'seed': 1,
@@ -54,26 +54,12 @@ def get_train_cfg(args):
 
     return train_cfg_dict
 
-
 def get_cfgs():
     env_cfg = {
         'urdf_path': 'urdf/go2/urdf/go2.urdf',
         'links_to_keep': ['FL_foot', 'FR_foot', 'RL_foot', 'RR_foot',],
         'num_actions': 12,
         'num_dofs': 12,
-        'terrain_cfg': {
-            # Size of the terrain grid (number of subterrains in x and y directions)
-            'n_subterrains': (1,1),
-            # Size of each subterrain in meters
-            'subterrain_size': (20.0, 20.0),
-            # Size of each cell in the terrain in meters
-            'horizontal_scale': 0.1,
-            # Height scale for the terrain (controls how high/low terrain features are)
-            'vertical_scale': 0.005,
-            # Types of terrain to generate
-            'subterrain_types': [['wave_terrain']]
-            
-    },
         # joint/link names
         'default_joint_angles': {  # [rad]
             'FL_hip_joint': 0.0,
@@ -112,9 +98,9 @@ def get_cfgs():
         'PD_damping': {'joint': 1.5},
         'use_implicit_controller': False,
         # termination
-        'termination_if_roll_greater_than': 0.4,
-        'termination_if_pitch_greater_than': 0.4,
-        'termination_if_height_lower_than': 0.0,
+        'termination_if_roll_greater_than': 0.6,  # More forgiving on uneven terrain
+        'termination_if_pitch_greater_than': 0.6, # More forgiving on uneven terrain
+        'termination_if_height_lower_than': 0.1,  # Allow for descending stairs
         # base pose
         'base_init_pos': [0.0, 0.0, 0.42],
         'base_init_quat': [1.0, 0.0, 0.0, 0.0],
@@ -122,9 +108,9 @@ def get_cfgs():
         'push_interval_s': -1,
         'max_push_vel_xy': 1.0,
         # time (second)
-        'episode_length_s': 20.0,
+        'episode_length_s': 30.0,  # Longer episodes to traverse terrain
         'resampling_time_s': 4.0,
-        'command_type': 'ang_vel_yaw',  # 'ang_vel_yaw' or 'heading'
+        'command_type': 'ang_vel_yaw',
         'action_scale': 0.25,
         'action_latency': 0.02,
         'clip_actions': 100.0,
@@ -132,7 +118,14 @@ def get_cfgs():
         'control_freq': 50,
         'decimation': 4,
         'feet_geom_offset': 1,
-        'use_terrain': True,
+        'use_terrain': True,  # Enable terrain
+        'terrain_cfg': {
+            'n_subterrains': (3, 1),  # 3 sections in length, 1 in width
+            'horizontal_scale': 0.25,
+            'vertical_scale': 0.005,
+            'subterrain_size': (12.0, 6.0),
+            'subterrain_types': "pyramid_stairs_terrain",
+        },
         # domain randomization
         'randomize_friction': True,
         'friction_range': [0.2, 1.5],
@@ -140,7 +133,7 @@ def get_cfgs():
         'added_mass_range': [-1., 3.],
         'randomize_com_displacement': True,
         'com_displacement_range': [-0.01, 0.01],
-        'randomize_motor_strength': False,
+        'randomize_motor_strength': True,
         'motor_strength_range': [0.9, 1.1],
         'randomize_motor_offset': True,
         'motor_offset_range': [-0.02, 0.02],
@@ -151,48 +144,61 @@ def get_cfgs():
         # coupling
         'coupling': False,
     }
+    
     obs_cfg = {
-        'num_obs': 9 + 3 * env_cfg['num_dofs'],
+        'num_obs': 9 + 3 * env_cfg['num_dofs'] + 5,  # Added 5 terrain height samples
         'num_history_obs': 1,
         'obs_noise': {
             'ang_vel': 0.1,
             'gravity': 0.02,
             'dof_pos': 0.01,
             'dof_vel': 0.5,
+            'terrain_height': 0.01,  # Slight noise in terrain perception
         },
         'obs_scales': {
             'lin_vel': 2.0,
             'ang_vel': 0.25,
             'dof_pos': 1.0,
             'dof_vel': 0.05,
+            'terrain_height': 5.0,  # Scale terrain heights for better sensitivity
         },
-        'num_priv_obs': 12 + 4 * env_cfg['num_dofs'],
+        'num_priv_obs': 12 + 4 * env_cfg['num_dofs'] + 8,  # Added terrain and position info
     }
+    
     reward_cfg = {
         'tracking_sigma': 0.25,
         'soft_dof_pos_limit': 0.9,
-        'base_height_target': 0.3,
+        'base_height_target': 0.4,
         'reward_scales': {
+            # Original rewards
             'tracking_lin_vel': 1.0,
             'tracking_ang_vel': 0.5,
-            'lin_vel_z': -2.0,
+            'lin_vel_z': -1.0,        # Less penalty for vertical movement on stairs
             'ang_vel_xy': -0.05,
-            'orientation': -10.,
-            'base_height': -50.,
-            'torques': -0.0002,
-            'collision': -1.,
-            'dof_vel': -0.,
+            'orientation': -5.0,       # Less strict on orientation due to slopes
+            'torques': -0.0001,
+            'dof_vel': -0.0,
             'dof_acc': -2.5e-7,
-            'feet_air_time': 1.0,
-            'collision': -1.,
+            'collision': -1.0,
             'action_rate': -0.01,
+            'feet_air_time': 0.5,      # Reduced emphasis on foot air time
+            
+            # New terrain-specific rewards
+            'forward_progress': 2.0,
+            'terrain_adaptation': -5.0,
+            'balance_on_slope': -2.0,
+            'foot_clearance': -1.0,
+            'gait_stability': -1.0,
+            'energy_efficiency': -0.001,
+            'foot_slip': -0.5,
         },
     }
+    
     command_cfg = {
         'num_commands': 4,
-        'lin_vel_x_range': [-1.0, 1.0],
-        'lin_vel_y_range': [-1.0, 1.0],
-        'ang_vel_range': [-1.0, 1.0],
+        'lin_vel_x_range': [0.5, 1.0],   # Focus on forward movement
+        'lin_vel_y_range': [-0.3, 0.3],  # Limited lateral movement
+        'ang_vel_range': [-0.3, 0.3],    # Limited turning
     }
 
     return env_cfg, obs_cfg, reward_cfg, command_cfg
@@ -230,7 +236,7 @@ def main():
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
-    env = Go2(
+    env = WalkUneven(
         num_envs=args.num_envs,
         env_cfg=env_cfg,
         obs_cfg=obs_cfg,
@@ -262,5 +268,5 @@ if __name__ == '__main__':
     main()
 
 '''
-python -m tasks.walk_on_uneven_terrain.train_walk_uneven --exp_name test -B 20000 --max_iterations 100
+python -m tasks.walk_on_uneven_terrain.train_walk_uneven --exp_name walk_uneven_v1 -B 20000 --max_iterations 100
 '''

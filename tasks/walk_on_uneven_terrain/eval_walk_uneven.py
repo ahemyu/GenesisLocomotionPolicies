@@ -1,9 +1,7 @@
 import argparse
-import copy
 import os
 import pickle
 
-import numpy as np
 import torch
 from tasks.reward_wrapper import Go2
 from rsl_rl.runners import OnPolicyRunner
