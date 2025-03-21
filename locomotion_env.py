@@ -59,7 +59,6 @@ class LocoEnv:
         else:
             assert device in ['cpu', 'cuda']
             self.device = torch.device(device)
-        
         # create scene
         self.scene = gs.Scene(
             sim_options=gs.options.SimOptions(
@@ -228,12 +227,6 @@ class LocoEnv:
             (self.num_envs,), device=self.device, dtype=gs.tc_int
         )
         self.time_out_buf = torch.zeros(
-            (self.num_envs,), device=self.device, dtype=gs.tc_int
-        )
-        self.progress_buf = torch.zeros(
-            (self.num_envs,), device=self.device, dtype=gs.tc_int
-        )
-        self.success_buf = torch.zeros(
             (self.num_envs,), device=self.device, dtype=gs.tc_int
         )
 
@@ -657,10 +650,32 @@ class LocoEnv:
         )
 
         # reset root states - position
-        self.base_pos[envs_idx] = self.base_init_pos
-        self.base_pos[envs_idx, :2] += gs_rand_float(
-            -1.0, 1.0, (len(envs_idx), 2), self.device
+        # Start the robot farther from the edge of the terrain
+        init_xy = torch.tensor([4.0, 3.0], device=self.device)
+        
+        # Apply some small randomization to the starting position
+        self.base_pos[envs_idx, :2] = init_xy + gs_rand_float(
+            -0.5, 0.5, (len(envs_idx), 2), self.device
         )
+        
+        # Sample terrain height at the robot's position for proper initialization
+        if self.env_cfg['use_terrain']:
+            clipped_base_pos = self.base_pos[envs_idx, :2].clamp(
+                min=torch.zeros(2, device=self.device), 
+                max=self.terrain_margin
+            )
+            
+            # Calculate terrain height at robot position
+            height_field_ids = (clipped_base_pos / self.terrain_cfg['horizontal_scale'] - 0.5).floor().int()
+            height_field_ids = height_field_ids.clamp(min=0)
+            terrain_heights = self.height_field[height_field_ids[:, 0], height_field_ids[:, 1]]
+            
+            # Place robot slightly above the terrain surface
+            self.base_pos[envs_idx, 2] = terrain_heights + 0.5  # 0.5m above terrain
+        else:
+            self.base_pos[envs_idx, 2] = self.base_init_pos[2]
+        
+        # Set the orientation    
         self.base_quat[envs_idx] = self.base_init_quat.reshape(1, -1)
         base_euler = gs_rand_float(
             -0.1, 0.1, (len(envs_idx), 3), self.device
@@ -670,6 +685,8 @@ class LocoEnv:
             gs_euler2quat(base_euler),
             self.base_quat[envs_idx],
         )
+        
+        # Apply changes to the robot
         self.robot.set_pos(
             self.base_pos[envs_idx], zero_velocity=False, envs_idx=envs_idx
         )

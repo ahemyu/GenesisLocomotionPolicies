@@ -3,7 +3,7 @@ import os
 import pickle
 import shutil
 import logging
-from reward_wrapper import WalkUneven
+from reward_wrapper import Go2
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
 
@@ -51,7 +51,7 @@ def get_train_cfg(args):
             'resume_path': None,
             'run_name': '',
             'runner_class_name': 'runner_class_name',
-            'save_interval': 50, # save more frequently to see if we make progress earlier
+            'save_interval': 1, # save more frequently to see if we make progress earlier
         },
         'runner_class_name': 'OnPolicyRunner',
         'seed': 1,
@@ -103,12 +103,12 @@ def get_cfgs():
         'PD_damping': {'joint': 1.5},
         'use_implicit_controller': False,
         # termination
-        'termination_if_roll_greater_than': 0.6,  # More forgiving on uneven terrain
-        'termination_if_pitch_greater_than': 0.6, # More forgiving on uneven terrain
-        'termination_if_height_lower_than': 0.1,  # Allow for descending stairs
+        'termination_if_roll_greater_than': 0.7,  # More lenient for uneven terrain
+        'termination_if_pitch_greater_than': 0.7, # More lenient for uneven terrain
+        'termination_if_height_lower_than': -0.3, # Allow for terrain variations
         # base pose
-        'base_init_pos': [0.0, 0.0, 0.42],
-        'base_init_quat': [1.0, 0.0, 0.0, 0.0],
+        'base_init_pos': [0.0, 0.0, 0.42], #will be overwritten in locmotion_env 
+        'base_init_quat': [1.0, 0.0, 0.0, 0.0], #standard upright orientation
         # random push
         'push_interval_s': -1,
         'max_push_vel_xy': 1.0,
@@ -151,59 +151,47 @@ def get_cfgs():
     }
     
     obs_cfg = {
-        'num_obs': 9 + 3 * env_cfg['num_dofs'] + 5, # Added 5 terrain height samples
+        'num_obs': 9 + 3 * env_cfg['num_dofs'],
         'num_history_obs': 1,
         'obs_noise': {
             'ang_vel': 0.1,
             'gravity': 0.02,
             'dof_pos': 0.01,
             'dof_vel': 0.5,
-            'terrain_height': 0.01, # Slight noise in terrain perception
         },
         'obs_scales': {
             'lin_vel': 2.0,
             'ang_vel': 0.25,
             'dof_pos': 1.0,
             'dof_vel': 0.05,
-            'terrain_height': 5.0, # Scale terrain heights for better sensitivity
         },
-        'num_priv_obs': 12 + 4 * env_cfg['num_dofs'] + 8, # Added terrain and position info
+        'num_priv_obs': 12 + 4 * env_cfg['num_dofs'],
     }
-    
     reward_cfg = {
         'tracking_sigma': 0.25,
         'soft_dof_pos_limit': 0.9,
-        'base_height_target': 0.4,
+        'base_height_target': 0.3,
         'reward_scales': {
-            # Original rewards
             'tracking_lin_vel': 1.0,
             'tracking_ang_vel': 0.5,
-            'lin_vel_z': -1.0, # Less penalty for vertical movement on stairs
+            'lin_vel_z': -2.0,
             'ang_vel_xy': -0.05,
-            'orientation': -5.0, # Less strict on orientation due to slopes
-            'torques': -0.0001,
-            'dof_vel': -0.0,
+            'orientation': -10.,
+            'base_height': -50.,
+            'torques': -0.0002,
+            'collision': -1.,
+            'dof_vel': -0.,
             'dof_acc': -2.5e-7,
-            'collision': -1.0,
+            'feet_air_time': 1.0,
+            'collision': -1.,
             'action_rate': -0.01,
-            'feet_air_time': 0.5, # Reduced emphasis on foot air time
-            
-            # terrain specific rewards
-            'forward_progress': 2.0,
-            'terrain_adaptation': -5.0,
-            'balance_on_slope': -2.0,
-            'foot_clearance': -1.0,
-            'gait_stability': -1.0,
-            'energy_efficiency': -0.001,
-            'foot_slip': -0.5,
         },
     }
-    
     command_cfg = {
         'num_commands': 4,
-        'lin_vel_x_range': [0.5, 1.0], # Focus on forward movement
-        'lin_vel_y_range': [-0.3, 0.3], # Limited lateral movement
-        'ang_vel_range': [-0.3, 0.3], # Limited turning
+        'lin_vel_x_range': [0.0, 0.5],  # Start with forward movement only
+        'lin_vel_y_range': [-0.2, 0.2],  # Limited lateral movement
+        'ang_vel_range': [-0.3, 0.3],    # Limited turning
     }
 
     return env_cfg, obs_cfg, reward_cfg, command_cfg
@@ -245,7 +233,7 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
 
     logger.info("Creating WalkUneven environment")
-    env = WalkUneven(
+    env = Go2(
         num_envs=args.num_envs,
         env_cfg=env_cfg,
         obs_cfg=obs_cfg,
@@ -279,5 +267,5 @@ if __name__ == '__main__':
     main()
 
 '''
-python train_walk_uneven.py -e walk_uneven_v1 -B 10000 --max_iterations 100
+python train_walk_uneven.py -e walk_uneven_v1 -B 1 --max_iterations 1
 '''
