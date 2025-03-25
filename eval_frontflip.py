@@ -9,14 +9,6 @@ from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
 
 
-def export_policy_as_jit(actor_critic, path, name):
-    os.makedirs(path, exist_ok=True)
-    path = os.path.join(path, f"{name}.pt")
-    model = copy.deepcopy(actor_critic.actor).to("cpu")
-    traced_script_module = torch.jit.script(model)
-    traced_script_module.save(path)
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--exp_name", type=str, default="frontflip")
@@ -47,25 +39,19 @@ def main():
     log_dir = f"logs/{args.exp_name}"
     jit_ckpt_path = os.path.join(log_dir, "exported", args.exp_name + f"_ckpt{args.ckpt}.pt")
 
-    if os.path.exists(jit_ckpt_path):
-        policy = torch.jit.load(jit_ckpt_path, map_location="cpu")  # Add map_location here
-        policy.to(device="cpu")
-    else:
-        args.max_iterations = 1
-        from train_frontflip import get_train_cfg
+    args.max_iterations = 1
+    from train_frontflip import get_train_cfg
 
-        runner = OnPolicyRunner(env, get_train_cfg(args), log_dir, device="cpu")
+    runner = OnPolicyRunner(env, get_train_cfg(args), log_dir, device="cpu")
 
-        # Load the checkpoint with map_location
-        resume_path = os.path.join(log_dir, f"model_{args.ckpt}.pt")
-        checkpoint = torch.load(resume_path, map_location="cpu")
-        runner.alg.actor_critic.load_state_dict(checkpoint["model_state_dict"])
-        runner.alg.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        # runner.current_learning_iteration = checkpoint["iteration"]
+    # Load the checkpoint with map_location
+    resume_path = os.path.join(log_dir, f"model_{args.ckpt}.pt")
+    checkpoint = torch.load(resume_path, map_location="cpu")
+    runner.alg.actor_critic.load_state_dict(checkpoint["model_state_dict"])
+    runner.alg.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    # runner.current_learning_iteration = checkpoint["iteration"]
 
-        path = os.path.join(log_dir, "exported")
-        export_policy_as_jit(runner.alg.actor_critic, path, args.exp_name + f"_ckpt{args.ckpt}")
-        policy = runner.get_inference_policy(device="cpu")
+    policy = runner.get_inference_policy(device="cpu")
 
     env.reset()
     obs = env.get_observations()
@@ -89,5 +75,5 @@ if __name__ == "__main__":
 
 """
 # Evaluation command
-python eval_frontflip.py -e frontflip --ckpt 600 --record  
+python eval_frontflip.py -e frontflip_worked --ckpt 1000 --record  
 """
