@@ -1,5 +1,5 @@
 import torch
-from complicated_env.locomotion_env import *
+from locomotion_env import *
 # yaw is from left to right, pitch is from up to down, roll is rotating 
 class Go2(LocoEnv):
     

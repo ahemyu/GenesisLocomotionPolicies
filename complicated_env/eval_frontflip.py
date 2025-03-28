@@ -3,7 +3,7 @@ import copy
 import os
 import pickle
 import torch
-from complicated_env.reward_wrapper import FrontFlip
+from reward_wrapper import FrontFlip
 from rsl_rl.runners import OnPolicyRunner
 
 import genesis as gs
@@ -40,7 +40,7 @@ def main():
     jit_ckpt_path = os.path.join(log_dir, "exported", args.exp_name + f"_ckpt{args.ckpt}.pt")
 
     args.max_iterations = 1
-    from complicated_env.train_frontflip import get_train_cfg
+    from train_frontflip import get_train_cfg
 
     runner = OnPolicyRunner(env, get_train_cfg(args), log_dir, device="cpu")
 

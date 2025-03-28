@@ -3,7 +3,7 @@ import torch
 
 import genesis as gs
 from genesis.engine.solvers.rigid.rigid_solver_decomp import RigidSolver
-from complicated_env.utils import *
+from utils import *
 class LocoEnv:
 
     def __init__(

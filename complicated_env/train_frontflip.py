@@ -2,7 +2,7 @@ import argparse
 import os
 import pickle
 import shutil
-from complicated_env.reward_wrapper import FrontFlip
+from reward_wrapper import FrontFlip
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
 
@@ -244,5 +244,5 @@ if __name__ == '__main__':
     main()
 
 '''
-python train_frontflip.py -e frontflip_v9  -B 30000
+python train_frontflip.py -e frontflip_nice  -B 30000
 '''
