@@ -16,12 +16,12 @@ class Go2Env:
         self.num_envs = num_envs
         self.num_obs = obs_cfg["num_obs"]
         self.num_privileged_obs = None
-        self.num_actions = env_cfg["num_actions"]
-        self.num_commands = command_cfg["num_commands"]
+        self.num_actions = env_cfg["num_actions"]#12
+        self.num_commands = command_cfg["num_commands"]#3
 
         self.simulate_action_latency = True  # there is a 1 step latency on real robot
         self.dt = 0.02  # control frequency on real robot is 50hz
-        self.max_episode_length = math.ceil(env_cfg["episode_length_s"] / self.dt)
+        self.max_episode_length = math.ceil(env_cfg["episode_length_s"] / self.dt) # 20/0.02 = 1000 steps
 
         self.env_cfg = env_cfg
         self.obs_cfg = obs_cfg
@@ -61,7 +61,7 @@ class Go2Env:
         # add robot
         self.base_init_pos = torch.tensor(self.env_cfg["base_init_pos"], device=self.device)
         self.base_init_quat = torch.tensor(self.env_cfg["base_init_quat"], device=self.device)
-        self.inv_base_init_quat = inv_quat(self.base_init_quat)
+        self.inv_base_init_quat = inv_quat(self.base_init_quat) # inverse of the initial orientation quaternion of the robot's base
         self.robot = self.scene.add_entity(
             gs.morphs.URDF(
                 file="urdf/go2/urdf/go2.urdf",
@@ -78,11 +78,11 @@ class Go2Env:
         self.scene.build(n_envs=num_envs)
 
         # names to indices
-        self.motor_dofs = [self.robot.get_joint(name).dof_idx_local for name in self.env_cfg["dof_names"]]
+        self.motor_dofs = [self.robot.get_joint(name).dof_idx_local for name in self.env_cfg["dof_names"]]# mapping from joint names to indices
 
         # PD control parameters
-        self.robot.set_dofs_kp([self.env_cfg["kp"]] * self.num_actions, self.motor_dofs)
-        self.robot.set_dofs_kv([self.env_cfg["kd"]] * self.num_actions, self.motor_dofs)
+        self.robot.set_dofs_kp([self.env_cfg["kp"]] * self.num_actions, self.motor_dofs) #apply kp to each joint
+        self.robot.set_dofs_kv([self.env_cfg["kd"]] * self.num_actions, self.motor_dofs)# apply kd to each joint
 
         # prepare reward functions and multiply reward scales by dt
         self.reward_functions, self.episode_sums = dict(), dict()
@@ -101,7 +101,7 @@ class Go2Env:
         self.obs_buf = torch.zeros((self.num_envs, self.num_obs), device=self.device, dtype=gs.tc_float)
         self.rew_buf = torch.zeros((self.num_envs,), device=self.device, dtype=gs.tc_float)
         self.reset_buf = torch.ones((self.num_envs,), device=self.device, dtype=gs.tc_int)
-        self.episode_length_buf = torch.zeros((self.num_envs,), device=self.device, dtype=gs.tc_int)
+        self.episode_length_buf = torch.zeros((self.num_envs,), device=self.device, dtype=gs.tc_int)# buffer to store episode length for each environment
         self.commands = torch.zeros((self.num_envs, self.num_commands), device=self.device, dtype=gs.tc_float)
         self.commands_scale = torch.tensor(
             [self.obs_scales["lin_vel"], self.obs_scales["lin_vel"], self.obs_scales["ang_vel"]],
@@ -127,45 +127,45 @@ class Go2Env:
         self.commands[envs_idx, 1] = gs_rand_float(*self.command_cfg["lin_vel_y_range"], (len(envs_idx),), self.device)
         self.commands[envs_idx, 2] = gs_rand_float(*self.command_cfg["ang_vel_range"], (len(envs_idx),), self.device)
 
-    def step(self, actions):
-        self.actions = torch.clip(actions, -self.env_cfg["clip_actions"], self.env_cfg["clip_actions"])
-        exec_actions = self.last_actions if self.simulate_action_latency else self.actions
-        target_dof_pos = exec_actions * self.env_cfg["action_scale"] + self.default_dof_pos
-        self.robot.control_dofs_position(target_dof_pos, self.motor_dofs)
-        self.scene.step()
+    def step(self, actions): #actions come from neural net
+        self.actions = torch.clip(actions, -self.env_cfg["clip_actions"], self.env_cfg["clip_actions"]) #clippimng to prevent extreme values
+        exec_actions = self.last_actions if self.simulate_action_latency else self.actions  #simulate action latency
+        target_dof_pos = exec_actions * self.env_cfg["action_scale"] + self.default_dof_pos # transform normalized policy actions into target joint positions
+        self.robot.control_dofs_position(target_dof_pos, self.motor_dofs)# send target positions to robot's PD controllers
+        self.scene.step() # advance the simulation by one step
 
         # update buffers
-        self.episode_length_buf += 1
-        self.base_pos[:] = self.robot.get_pos()
-        self.base_quat[:] = self.robot.get_quat()
-        self.base_euler = quat_to_xyz(
+        self.episode_length_buf += 1 # increment episode length
+        self.base_pos[:] = self.robot.get_pos() # get fresh robot base position
+        self.base_quat[:] = self.robot.get_quat() # get fresh robot base orientation
+        self.base_euler = quat_to_xyz( 
             transform_quat_by_quat(torch.ones_like(self.base_quat) * self.inv_base_init_quat, self.base_quat)
-        )
+        ) # get fresh robot base orientation in euler angles (roll, pitch, yaw)
         inv_base_quat = inv_quat(self.base_quat)
-        self.base_lin_vel[:] = transform_by_quat(self.robot.get_vel(), inv_base_quat)
-        self.base_ang_vel[:] = transform_by_quat(self.robot.get_ang(), inv_base_quat)
-        self.projected_gravity = transform_by_quat(self.global_gravity, inv_base_quat)
-        self.dof_pos[:] = self.robot.get_dofs_position(self.motor_dofs)
-        self.dof_vel[:] = self.robot.get_dofs_velocity(self.motor_dofs)
+        self.base_lin_vel[:] = transform_by_quat(self.robot.get_vel(), inv_base_quat) # transform world lin vel to robot's base frame
+        self.base_ang_vel[:] = transform_by_quat(self.robot.get_ang(), inv_base_quat)# transform world ang vel to robot's base frame
+        self.projected_gravity = transform_by_quat(self.global_gravity, inv_base_quat) # project gravity vector to robot's base frame
+        self.dof_pos[:] = self.robot.get_dofs_position(self.motor_dofs)# update joint positions
+        self.dof_vel[:] = self.robot.get_dofs_velocity(self.motor_dofs)# update joint velocities
 
         # resample commands
         envs_idx = (
             (self.episode_length_buf % int(self.env_cfg["resampling_time_s"] / self.dt) == 0)
             .nonzero(as_tuple=False)
             .flatten()
-        )
-        self._resample_commands(envs_idx)
+        ) # will contain the indices of all environments that have reached a multiple of 200 timesteps, and thus need resampling
+        self._resample_commands(envs_idx) # resample commands for those environments
 
         # check termination and reset
-        self.reset_buf = self.episode_length_buf > self.max_episode_length
-        self.reset_buf |= torch.abs(self.base_euler[:, 1]) > self.env_cfg["termination_if_pitch_greater_than"]
-        self.reset_buf |= torch.abs(self.base_euler[:, 0]) > self.env_cfg["termination_if_roll_greater_than"]
+        self.reset_buf = self.episode_length_buf > self.max_episode_length# if we reached 1000 steps, we need to reset the environment
+        self.reset_buf |= torch.abs(self.base_euler[:, 1]) > self.env_cfg["termination_if_pitch_greater_than"]# if pitch(forward/backward tilt) is greater than 10 degrees, we need to reset the environment
+        self.reset_buf |= torch.abs(self.base_euler[:, 0]) > self.env_cfg["termination_if_roll_greater_than"]# if roll(side-to-side tilt) is greater than 10 degrees, we need to reset the environment
 
-        time_out_idx = (self.episode_length_buf > self.max_episode_length).nonzero(as_tuple=False).flatten()
+        time_out_idx = (self.episode_length_buf > self.max_episode_length).nonzero(as_tuple=False).flatten()# environments that have reached the max episode length
         self.extras["time_outs"] = torch.zeros_like(self.reset_buf, device=self.device, dtype=gs.tc_float)
-        self.extras["time_outs"][time_out_idx] = 1.0
+        self.extras["time_outs"][time_out_idx] = 1.0 # used by PPO to handle terminated vs. truncated episodes differently
 
-        self.reset_idx(self.reset_buf.nonzero(as_tuple=False).flatten())
+        self.reset_idx(self.reset_buf.nonzero(as_tuple=False).flatten())# reset the environments that need to be reset
 
         # compute reward
         self.rew_buf[:] = 0.0
@@ -177,12 +177,12 @@ class Go2Env:
         # compute observations
         self.obs_buf = torch.cat(
             [
-                self.base_ang_vel * self.obs_scales["ang_vel"],  # 3
-                self.projected_gravity,  # 3
-                self.commands * self.commands_scale,  # 3
-                (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 12
-                self.dof_vel * self.obs_scales["dof_vel"],  # 12
-                self.actions,  # 12
+                self.base_ang_vel * self.obs_scales["ang_vel"],  # 3, the robot's angular velocity in its base frame(3d)
+                self.projected_gravity,  # 3, gravity vector in the robot's base frame, indicating its orientation
+                self.commands * self.commands_scale,  # 3, target velocities the robot should achieve
+                (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 12, current joint angles relative to default
+                self.dof_vel * self.obs_scales["dof_vel"],  # 12, current joint velocities 
+                self.actions,  # 12 # previous actions issued by the policy
             ],
             axis=-1,
         )
@@ -248,32 +248,32 @@ class Go2Env:
 
     # ------------ reward functions---------------
     def _reward_tracking_lin_vel(self):
+        """How closely the robot's actual forward and lateral velocities match the commanded values."""
         # Tracking of linear velocity commands (xy axes)
         lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
-        return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
+        return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"]) # creates a reward that's 1.0 when error is zero, and decays toward 0 as error increases
 
     def _reward_tracking_ang_vel(self):
+        """How closely the robot's turning rate matches the commanded angular velocity"""
         # Tracking of angular velocity commands (yaw)
         ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
         return torch.exp(-ang_vel_error / self.reward_cfg["tracking_sigma"])
 
     def _reward_lin_vel_z(self):
+        """ Discourages bouncy walking gaits; keeps the robot's height relatively stable"""
         # Penalize z axis base linear velocity
         return torch.square(self.base_lin_vel[:, 2])
 
-    #TODO might need to reduce this or entirely remove it
     def _reward_action_rate(self):
-        # Penalize changes in actions
+        # Penalize large changes in actions between consecutive steps, Encourages smooth, consistent motions rather than jerky, erratic movements
         return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
     
-    # TODO: might need to reduce this or entirely remove it
     def _reward_similar_to_default(self):
-        # Penalize joint poses far away from default pose
+        # Penalize joint poses far away from default pose, Encourages energy-efficient gaits that don't deviate too far from a natural standing position
         return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1)
     
-    # TODO: might need to reduce this or entirely remove it
     def _reward_base_height(self):
-        # Penalize base height away from target
+        # Penalize base height away from target, Encourages energy-efficient gaits that don't deviate too far from a natural standing position
         return torch.square(self.base_pos[:, 2] - self.reward_cfg["base_height_target"])
 
     # ------------ Camera and recording functions ----------------

@@ -113,16 +113,16 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        "tracking_sigma": 0.25,
+        "tracking_sigma": 0.25,# controls how quickly the reward falls off with increasing error
         "base_height_target": 0.3,
         "feet_height_target": 0.075,
         "reward_scales": {
-            "tracking_lin_vel": 1.0,
-            "tracking_ang_vel": 0.2,
-            "lin_vel_z": -1.0,
-            "base_height": -50.0,
-            "action_rate": -0.005,
-            "similar_to_default": -0.1,
+            "tracking_lin_vel": 1.0,         # Reward for matching linear velocity
+            "tracking_ang_vel": 0.2,         # Reward for matching angular velocity
+            "lin_vel_z": -1.0,               # Penalty for vertical movement
+            "base_height": -50.0,            # Penalty for incorrect torso height
+            "action_rate": -0.005,           # Small penalty for rapid action changes
+            "similar_to_default": -0.1,      # Small penalty for joint positions far from default
         },
     }
     command_cfg = {
