@@ -3,7 +3,8 @@ import math
 import numpy as np
 import genesis as gs
 from genesis.utils.geom import quat_to_xyz, transform_by_quat, inv_quat, transform_quat_by_quat
-
+from genesis.engine.entities.rigid_entity import RigidEntity
+from genesis.engine.scene import Scene
 
 def gs_rand_float(lower, upper, shape, device):
     return (upper - lower) * torch.rand(size=shape, device=device) + lower
@@ -13,31 +14,31 @@ class Go2Env:
     def __init__(self, num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg, show_viewer=False, device="cuda"):
         self.device = torch.device(device)
 
-        self.num_envs = num_envs
-        self.num_obs = obs_cfg["num_obs"]
+        self.num_envs: int = num_envs
+        self.num_obs: int = obs_cfg["num_obs"] #48
         self.num_privileged_obs = None
-        self.num_actions = env_cfg["num_actions"]#12
-        self.num_commands = command_cfg["num_commands"]#3
+        self.num_actions: int = env_cfg["num_actions"]#12
+        self.num_commands: int = command_cfg["num_commands"]#3
 
-        self.simulate_action_latency = True  # there is a 1 step latency on real robot
-        self.dt = 0.02  # control frequency on real robot is 50hz
-        self.max_episode_length = math.ceil(env_cfg["episode_length_s"] / self.dt) # 20/0.02 = 1000 steps
+        self.simulate_action_latency: bool = True  # there is a 1 step latency on real robot
+        self.dt: float = 0.02  # control frequency on real robot is 50hz
+        self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 20/0.02 = 1000 steps
 
-        self.env_cfg = env_cfg
-        self.obs_cfg = obs_cfg
-        self.reward_cfg = reward_cfg
-        self.command_cfg = command_cfg
+        self.env_cfg: dict = env_cfg
+        self.obs_cfg: dict = obs_cfg
+        self.reward_cfg: dict = reward_cfg
+        self.command_cfg: dict = command_cfg
 
-        self.obs_scales = obs_cfg["obs_scales"]
-        self.reward_scales = reward_cfg["reward_scales"]
+        self.obs_scales: dict = obs_cfg["obs_scales"]
+        self.reward_scales: dict = reward_cfg["reward_scales"]
         
         # Camera and recording related variables
-        self.headless = not show_viewer
-        self._recording = False
-        self._recorded_frames = []
+        self.headless: bool = not show_viewer
+        self._recording: bool = False
+        self._recorded_frames: list = []
 
         # create scene
-        self.scene = gs.Scene(
+        self.scene: Scene = gs.Scene(
             sim_options=gs.options.SimOptions(dt=self.dt, substeps=2),
             viewer_options=gs.options.ViewerOptions(
                 max_FPS=int(0.5 / self.dt),
@@ -62,7 +63,7 @@ class Go2Env:
         self.base_init_pos = torch.tensor(self.env_cfg["base_init_pos"], device=self.device)
         self.base_init_quat = torch.tensor(self.env_cfg["base_init_quat"], device=self.device)
         self.inv_base_init_quat = inv_quat(self.base_init_quat) # inverse of the initial orientation quaternion of the robot's base
-        self.robot = self.scene.add_entity(
+        self.robot: RigidEntity  = self.scene.add_entity(
             gs.morphs.URDF(
                 file="urdf/go2/urdf/go2.urdf",
                 pos=self.base_init_pos.cpu().numpy(),
@@ -78,7 +79,7 @@ class Go2Env:
         self.scene.build(n_envs=num_envs)
 
         # names to indices
-        self.motor_dofs = [self.robot.get_joint(name).dof_idx_local for name in self.env_cfg["dof_names"]]# mapping from joint names to indices
+        self.motor_dofs: list[int] = [self.robot.get_joint(name).dof_idx_local for name in self.env_cfg["dof_names"]]# mapping from joint names to indices
 
         # PD control parameters
         self.robot.set_dofs_kp([self.env_cfg["kp"]] * self.num_actions, self.motor_dofs) #apply kp to each joint
