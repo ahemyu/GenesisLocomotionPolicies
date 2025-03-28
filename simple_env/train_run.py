@@ -3,7 +3,7 @@ import os
 import pickle
 import shutil
 
-from simple_go2_env import Go2Env
+from simple_env.simple_go2_env import Go2Env
 from rsl_rl.runners import OnPolicyRunner
 
 import genesis as gs
@@ -99,7 +99,7 @@ def get_cfgs():
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 20.0,
         "resampling_time_s": 4.0,
-        "action_scale": 0.50, #changed from 0.25
+        "action_scale": 0.25,
         "simulate_action_latency": True,
         "clip_actions": 100.0,
     }
@@ -113,21 +113,21 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        "tracking_sigma": 1.0, # from 0.25 
+        "tracking_sigma": 0.5, # controls how quickly the reward falls off with increasing error
         "base_height_target": 0.3,
         "feet_height_target": 0.075,
         "reward_scales": {
-            "tracking_lin_vel": 1.0,
-            "tracking_ang_vel": 0.2,
-            "lin_vel_z": -1.0,
-            "base_height": -50.0,
-            "action_rate": -0.005,
-            "similar_to_default": 0.0, #from -0.1
+            "tracking_lin_vel": 1.0,         # Reward for matching linear velocity
+            "tracking_ang_vel": 0.2,         # Reward for matching angular velocity
+            "lin_vel_z": -1.0,               # Penalty for vertical movement
+            "base_height": -50.0,            # Penalty for incorrect torso height
+            "action_rate": -0.005,           # Small penalty for rapid action changes
+            "similar_to_default": -0.1,      # Small penalty for joint positions far from default
         },
     }
     command_cfg = {
         "num_commands": 3,
-        "lin_vel_x_range": [1.5, 1.5], #from 0.5 to 1.5 
+        "lin_vel_x_range": [0.5, 0.5],
         "lin_vel_y_range": [0, 0],
         "ang_vel_range": [0, 0],
     }
@@ -137,9 +137,9 @@ def get_cfgs():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="go2-walking")
-    parser.add_argument("-B", "--num_envs", type=int, default=5000)
-    parser.add_argument("--max_iterations", type=int, default=500)
+    parser.add_argument("-e", "--exp_name", type=str, default="go2-running")
+    parser.add_argument("-B", "--num_envs", type=int, default=4096)
+    parser.add_argument("--max_iterations", type=int, default=100)
     args = parser.parse_args()
 
     gs.init(logging_level="warning")
@@ -170,5 +170,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v2 -B 5000 --max_iterations 500 
+python train_run.py -e go2-running_v3 -B 5000 --max_iterations 500 
 """
