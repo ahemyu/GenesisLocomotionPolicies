@@ -3,7 +3,7 @@ import os
 import pickle
 import shutil
 
-from simple_env.simple_go2_env import Go2Env
+from simple_go2_env import Go2Env
 from rsl_rl.runners import OnPolicyRunner
 
 import genesis as gs
@@ -104,7 +104,7 @@ def get_cfgs():
         "clip_actions": 100.0,
     }
     obs_cfg = {
-        "num_obs": 45,
+        "num_obs": 48,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -127,7 +127,7 @@ def get_cfgs():
     }
     command_cfg = {
         "num_commands": 3,
-        "lin_vel_x_range": [0.5, 0.5],
+        "lin_vel_x_range": [0.5, 1.0],
         "lin_vel_y_range": [0, 0],
         "ang_vel_range": [0, 0],
     }
@@ -137,9 +137,9 @@ def get_cfgs():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="go2-running")
-    parser.add_argument("-B", "--num_envs", type=int, default=4096)
-    parser.add_argument("--max_iterations", type=int, default=100)
+    parser.add_argument("-e", "--exp_name", type=str, default="go2-running_test")
+    parser.add_argument("-B", "--num_envs", type=int, default=2)
+    parser.add_argument("--max_iterations", type=int, default=1)
     args = parser.parse_args()
 
     gs.init(logging_level="warning")
@@ -170,5 +170,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v3 -B 5000 --max_iterations 500 
+python train_run.py -e go2-running_v3 -B 1 --max_iterations 1 
 """
