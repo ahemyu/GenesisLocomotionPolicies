@@ -48,7 +48,7 @@ def main():
             n_frames += 1
             if args.record:
                 if n_frames == 300:
-                    env.stop_recording("go2_running_v4.mp4")
+                    env.stop_recording("go2_running_v5.mp4")
                     exit()
 
 
@@ -56,5 +56,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk.py -e go2-running_v4 -r --ckpt 1000
+python eval_walk.py -e go2-running_v5 -r --ckpt 1000
 """

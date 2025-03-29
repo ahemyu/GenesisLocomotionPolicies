@@ -202,7 +202,7 @@ class Go2Env:
             self.robot.get_links_net_contact_force(),
             device=self.device,
             dtype=gs.tc_float,
-        )
+        )# net force applied on each links due to direct external contacts, shape (num_envs, num_links, 3)
         # resample commands
         envs_idx = (
             (self.episode_length_buf % int(self.env_cfg["resampling_time_s"] / self.dt) == 0)
@@ -354,16 +354,38 @@ class Go2Env:
             ),
             dim=1,
         )
+    def _reward_aerial_phase(self):
+        """Reward periods when all feet are off the ground (aerial phase)"""
+        # Check if any feet are in contact with ground
+        feet_contact = torch.norm(
+            self.link_contact_forces[:, self.feet_link_indices, :],
+            dim=-1
+        ) > 0.1
+        
+        # Reward when no feet are in contact (all feet in air)
+        no_contact = (~torch.any(feet_contact, dim=1)).float()
+        return no_contact
 
-    # def _reward_termination(self):
-    #     # Terminal reward / penalty
-    #     return self.reset_buf * ~self.time_out_buf
+    def _reward_stride_efficiency(self):
+        """Reward efficient strides - larger distance per step"""
+        # Check if feet are in contact with ground
+        feet_contact = torch.norm(
+            self.link_contact_forces[:, self.feet_link_indices, :],
+            dim=-1
+        ) > 0.1
+        
+        # Get horizontal velocity of each foot
+        foot_horizontal_vel = torch.norm(self.foot_velocities[:, :, :2], dim=-1)
+        
+        # Create a mask for feet that are not in contact (in swing phase)
+        swing_mask = (~feet_contact).float()
+        
+        # Multiply velocity by mask to zero out stance phase velocities
+        foot_swing_vel = foot_horizontal_vel * swing_mask
+        
+        # Average across all feet
+        return torch.mean(foot_swing_vel, dim=1)
 
-    # def _reward_dof_pos_limits(self):
-    #     # Penalize dof positions too close to the limit
-    #     out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
-    #     out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
-    #     return torch.sum(out_of_limits, dim=1)
 
     # ------------ Camera and recording functions ----------------
     def _set_camera(self):
