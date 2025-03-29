@@ -128,6 +128,9 @@ class Go2Env:
             device=self.device,
             dtype=gs.tc_float,
         )
+        self.link_contact_forces = torch.zeros(
+            (self.num_envs, self.robot.n_links, 3), device=self.device, dtype=gs.tc_float
+        )
         self.extras = dict()  # extra information for logging
 
 
@@ -214,7 +217,11 @@ class Go2Env:
         self.foot_positions[:] = self.rigid_solver.get_links_pos(self.feet_link_indices_world_frame)# update foot positions
         self.foot_quaternions[:] = self.rigid_solver.get_links_quat(self.feet_link_indices_world_frame) # update foot orientations
         self.foot_velocities[:] = self.rigid_solver.get_links_vel(self.feet_link_indices_world_frame)# update foot velocities
-
+        self.link_contact_forces[:] = torch.tensor(
+            self.robot.get_links_net_contact_force(),
+            device=self.device,
+            dtype=gs.tc_float,
+        )
         # resample commands
         envs_idx = (
             (self.episode_length_buf % int(self.env_cfg["resampling_time_s"] / self.dt) == 0)

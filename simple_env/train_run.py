@@ -122,14 +122,14 @@ def get_cfgs():
         "base_height_target": 0.3,
         "feet_height_target": 0.075,
         "reward_scales": {
-            "tracking_lin_vel": 2.0,         # Reward for matching linear velocity
-            "tracking_ang_vel": 0.2,         # Reward for matching angular velocity
-            "lin_vel_z": -1.0,               # Penalty for vertical movement
-            "ang_vel_xy": -0.05,               # Penalty for angular velocity in x and y
-            "base_height": -20.0,            # Penalty for incorrect torso height
-            "action_rate": -0.001,           # penalty for rapid action changes
-            "collision": -1.,                # Penalty for collisions on of the penalized links (base, thigh, calf)
-            'orientation': 0.0,              # Penalty for non flat base orientation
+            "tracking_lin_vel": 2.0, # Reward for matching linear velocity
+            "tracking_ang_vel": 0.2, # Reward for matching angular velocity
+            "lin_vel_z": -0.05,      # Penalty for vertical movement
+            "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
+            "base_height": -20.0,    # Penalty for incorrect torso height
+            "action_rate": -0.001,   # penalty for rapid action changes
+            "collision": -1.,        # Penalty for collisions on of the penalized links (base, thigh, calf)
+            'orientation': 0.0,      # Penalty for non flat base orientation
         },
     }
     command_cfg = {
@@ -177,5 +177,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e testo -B 1 --max_iterations 1 
+python train_run.py -e go2-running_v3 -B 20000 --max_iterations 1000 
 """
