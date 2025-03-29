@@ -47,7 +47,7 @@ def get_train_cfg(exp_name, max_iterations):
             "resume_path": None,
             "run_name": "",
             "runner_class_name": "runner_class_name",
-            "save_interval": 100,
+            "save_interval": 1000,
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1,
@@ -94,7 +94,7 @@ def get_cfgs():
         'feet_link_names': ['foot'],
         'base_link_name': ['base'],
         # PD
-        "kp": 20.0,
+        "kp": 20.0, 
         "kd": 0.5,
         # termination
         "termination_if_roll_greater_than": 10,  # degree
@@ -122,21 +122,21 @@ def get_cfgs():
         "base_height_target": 0.3,
         "feet_height_target": 0.075,
         "reward_scales": {
-            "tracking_lin_vel": 2.0, # Reward for matching linear velocity
+            "tracking_lin_vel": 5.0, # Reward for matching linear velocity
             "tracking_ang_vel": 0.2, # Reward for matching angular velocity
             "lin_vel_z": -0.05,      # Penalty for vertical movement
             "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
-            "base_height": -20.0,    # Penalty for incorrect torso height
+            "base_height": -10.0,    # Penalty for incorrect torso height
             "action_rate": -0.001,   # penalty for rapid action changes
-            "collision": -1.,        # Penalty for collisions on of the penalized links (base, thigh, calf)
-            'orientation': 0.0,      # Penalty for non flat base orientation
+            "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
+            'orientation': -5.0,      # Penalty for non flat base orientation
         },
     }
     command_cfg = {
         "num_commands": 3,
-        "lin_vel_x_range": [1.0, 2.0],
-        "lin_vel_y_range": [-0.2, 0.2],
-        "ang_vel_range": [-0.1, 0.1],
+        "lin_vel_x_range": [1.0, 3.0],
+        "lin_vel_y_range": [0, 0],
+        "ang_vel_range": [0, 0],
     }
 
     return env_cfg, obs_cfg, reward_cfg, command_cfg
@@ -177,5 +177,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v3 -B 20000 --max_iterations 1000 
+python train_run.py -e go2-running_v4 -B 30000 --max_iterations 1000 
 """

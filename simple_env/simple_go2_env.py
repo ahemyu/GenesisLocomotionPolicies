@@ -78,9 +78,8 @@ class Go2Env:
             ),
         )
 
-        # Initialize camera
-        if gs.platform != 'macOS':
-            self._set_camera()
+    
+        self._set_camera()
 
         # build
         self.scene.build(n_envs=num_envs)
@@ -152,33 +151,15 @@ class Go2Env:
         ) # not used for now
         self.penalized_contact_link_indices = find_link_indices(
             self.env_cfg['penalized_contact_link_names']
-        ) # nicknames of the links that are penalized for contact
+        ) # indices of the links that we want to penalize for contact forces
         self.feet_link_indices = find_link_indices(
             self.env_cfg['feet_link_names']
-        )
-        assert len(self.termination_contact_link_indices) > 0
-        assert len(self.penalized_contact_link_indices) > 0
-        assert len(self.feet_link_indices) > 0
+        ) # indices of feet links
+
         ### foot related stuff ###
         self.feet_link_indices_world_frame = [i+1 for i in self.feet_link_indices]
-        self.feet_air_time = torch.zeros(
-            (self.num_envs, len(self.feet_link_indices)),
-            device=self.device,
-            dtype=gs.tc_float,
-        ) #not used for now
-        self.feet_max_height = torch.zeros(
-            (self.num_envs, len(self.feet_link_indices)),
-            device=self.device,
-            dtype=gs.tc_float,
-        ) #not used for now
 
-        self.last_contacts = torch.zeros(
-            (self.num_envs, len(self.feet_link_indices)),
-            device=self.device,
-            dtype=gs.tc_int,
-        )
-
-        ###  gait control ###
+        ##  gait control ##
         self.foot_positions = torch.ones(
             self.num_envs, len(self.feet_link_indices), 3, device=self.device, dtype=gs.tc_float,
         ) #not used for now
@@ -263,8 +244,7 @@ class Go2Env:
         )
 
         # Render for recording if enabled
-        if gs.platform != 'macOS':
-            self._render_headless()
+        self._render_headless()
 
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
@@ -305,8 +285,6 @@ class Go2Env:
         self.last_dof_vel[envs_idx] = 0.0
         self.episode_length_buf[envs_idx] = 0
         self.reset_buf[envs_idx] = True
-        self.feet_air_time[envs_idx] = 0.0
-        self.feet_max_height[envs_idx] = 0.0
 
         # fill extras
         self.extras["episode"] = {}
@@ -386,18 +364,6 @@ class Go2Env:
     #     out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
     #     out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
     #     return torch.sum(out_of_limits, dim=1)
-
-    # def _reward_feet_air_time(self):
-    #     # Reward long steps
-    #     contact = self.link_contact_forces[:, self.feet_link_indices, 2] > 1.
-    #     contact_filt = torch.logical_or(contact, self.last_contacts) 
-    #     self.last_contacts = contact
-    #     first_contact = (self.feet_air_time > 0.) * contact_filt
-    #     self.feet_air_time += self.dt
-    #     rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1) # reward only on first contact with the ground
-    #     rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1 #no reward for zero command
-    #     self.feet_air_time *= ~contact_filt
-    #     return rew_airTime
 
     # ------------ Camera and recording functions ----------------
     def _set_camera(self):
