@@ -5,6 +5,7 @@ import genesis as gs
 from genesis.utils.geom import quat_to_xyz, transform_by_quat, inv_quat, transform_quat_by_quat
 from genesis.engine.entities.rigid_entity import RigidEntity
 from genesis.engine.scene import Scene
+from genesis.engine.solvers.rigid.rigid_solver_decomp import RigidSolver
 
 def gs_rand_float(lower, upper, shape, device):
     return (upper - lower) * torch.rand(size=shape, device=device) + lower
@@ -56,7 +57,12 @@ class Go2Env:
             show_viewer=show_viewer,
         )
 
-        # add plain
+        for solver in self.scene.sim.solvers:
+            if not isinstance(solver, RigidSolver):
+                continue
+            self.rigid_solver = solver
+
+        # add plane
         self.scene.add_entity(gs.morphs.URDF(file="urdf/plane/plane.urdf", fixed=True))
 
         # add robot
@@ -66,6 +72,7 @@ class Go2Env:
         self.robot: RigidEntity  = self.scene.add_entity(
             gs.morphs.URDF(
                 file="urdf/go2/urdf/go2.urdf",
+                links_to_keep=self.env_cfg['links_to_keep'],
                 pos=self.base_init_pos.cpu().numpy(),
                 quat=self.base_init_quat.cpu().numpy(),
             ),
@@ -123,6 +130,62 @@ class Go2Env:
         )
         self.extras = dict()  # extra information for logging
 
+
+        def find_link_indices(names):
+            """Finds the indices of the links in the robot that match the given names."""
+            link_indices = list()
+
+            for link in self.robot.links:
+                flag = False
+                for name in names:
+                    if name in link.name:
+                        flag = True
+                if flag:
+                    link_indices.append(link.idx - self.robot.link_start)
+            return link_indices
+
+        self.termination_contact_link_indices = find_link_indices(
+            self.env_cfg['termination_contact_link_names']
+        ) # not used for now
+        self.penalized_contact_link_indices = find_link_indices(
+            self.env_cfg['penalized_contact_link_names']
+        ) # nicknames of the links that are penalized for contact
+        self.feet_link_indices = find_link_indices(
+            self.env_cfg['feet_link_names']
+        )
+        assert len(self.termination_contact_link_indices) > 0
+        assert len(self.penalized_contact_link_indices) > 0
+        assert len(self.feet_link_indices) > 0
+        ### foot related stuff ###
+        self.feet_link_indices_world_frame = [i+1 for i in self.feet_link_indices]
+        self.feet_air_time = torch.zeros(
+            (self.num_envs, len(self.feet_link_indices)),
+            device=self.device,
+            dtype=gs.tc_float,
+        ) #not used for now
+        self.feet_max_height = torch.zeros(
+            (self.num_envs, len(self.feet_link_indices)),
+            device=self.device,
+            dtype=gs.tc_float,
+        ) #not used for now
+
+        self.last_contacts = torch.zeros(
+            (self.num_envs, len(self.feet_link_indices)),
+            device=self.device,
+            dtype=gs.tc_int,
+        )
+
+        ###  gait control ###
+        self.foot_positions = torch.ones(
+            self.num_envs, len(self.feet_link_indices), 3, device=self.device, dtype=gs.tc_float,
+        ) #not used for now
+        self.foot_quaternions = torch.ones(
+            self.num_envs, len(self.feet_link_indices), 4, device=self.device, dtype=gs.tc_float,
+        )# not used for now
+        self.foot_velocities = torch.ones(
+            self.num_envs, len(self.feet_link_indices), 3, device=self.device, dtype=gs.tc_float,
+        )# not used for now
+    
     def _resample_commands(self, envs_idx):
         self.commands[envs_idx, 0] = gs_rand_float(*self.command_cfg["lin_vel_x_range"], (len(envs_idx),), self.device)
         self.commands[envs_idx, 1] = gs_rand_float(*self.command_cfg["lin_vel_y_range"], (len(envs_idx),), self.device)
@@ -148,6 +211,9 @@ class Go2Env:
         self.projected_gravity = transform_by_quat(self.global_gravity, inv_base_quat) # project gravity vector to robot's base frame
         self.dof_pos[:] = self.robot.get_dofs_position(self.motor_dofs)# update joint positions
         self.dof_vel[:] = self.robot.get_dofs_velocity(self.motor_dofs)# update joint velocities
+        self.foot_positions[:] = self.rigid_solver.get_links_pos(self.feet_link_indices_world_frame)# update foot positions
+        self.foot_quaternions[:] = self.rigid_solver.get_links_quat(self.feet_link_indices_world_frame) # update foot orientations
+        self.foot_velocities[:] = self.rigid_solver.get_links_vel(self.feet_link_indices_world_frame)# update foot velocities
 
         # resample commands
         envs_idx = (
@@ -232,6 +298,8 @@ class Go2Env:
         self.last_dof_vel[envs_idx] = 0.0
         self.episode_length_buf[envs_idx] = 0
         self.reset_buf[envs_idx] = True
+        self.feet_air_time[envs_idx] = 0.0
+        self.feet_max_height[envs_idx] = 0.0
 
         # fill extras
         self.extras["episode"] = {}
@@ -250,33 +318,79 @@ class Go2Env:
 
     # ------------ reward functions---------------
     def _reward_tracking_lin_vel(self):
-        """How closely the robot's actual forward and lateral velocities match the commanded values."""
         # Tracking of linear velocity commands (xy axes)
-        lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
-        return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"]) # creates a reward that's 1.0 when error is zero, and decays toward 0 as error increases
+        lin_vel_error = torch.sum(
+            torch.square(
+                self.commands[:, :2] - self.base_lin_vel[:, :2]
+            ),
+            dim=1,
+        )
+        return torch.exp(-lin_vel_error / self.reward_cfg['tracking_sigma'])
 
     def _reward_tracking_ang_vel(self):
-        """How closely the robot's turning rate matches the commanded angular velocity"""
         # Tracking of angular velocity commands (yaw)
-        ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
-        return torch.exp(-ang_vel_error / self.reward_cfg["tracking_sigma"])
+        ang_vel_error = torch.square(
+            self.commands[:, 2] - self.base_ang_vel[:, 2]
+        )
+        return torch.exp(-ang_vel_error / self.reward_cfg['tracking_sigma'])
 
     def _reward_lin_vel_z(self):
-        """ Discourages bouncy walking gaits; keeps the robot's height relatively stable"""
         # Penalize z axis base linear velocity
         return torch.square(self.base_lin_vel[:, 2])
 
+    def _reward_ang_vel_xy(self):
+        # Penalize xy axes base angular velocity
+        return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
+
+    def _reward_orientation(self):
+        # Penalize non flat base orientation
+        return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
+
     def _reward_action_rate(self):
-        # Penalize large changes in actions between consecutive steps, Encourages smooth, consistent motions rather than jerky, erratic movements
+        # Penalize changes in actions
         return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
-    
-    def _reward_similar_to_default(self):
-        # Penalize joint poses far away from default pose, Encourages energy-efficient gaits that don't deviate too far from a natural standing position
-        return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1)
-    
+
     def _reward_base_height(self):
-        # Penalize base height away from target, Encourages energy-efficient gaits that don't deviate too far from a natural standing position
-        return torch.square(self.base_pos[:, 2] - self.reward_cfg["base_height_target"])
+        # Penalize base height away from target
+        base_height = self.base_pos[:, 2]
+        base_height_target = self.reward_cfg['base_height_target']
+        return torch.square(base_height - base_height_target)
+
+    def _reward_collision(self):
+        # Penalize collisions on selected bodies
+        return torch.sum(
+            1.0
+            * (
+                torch.norm(
+                    self.link_contact_forces[:, self.penalized_contact_link_indices, :],
+                    dim=-1,
+                )
+                > 0.1
+            ),
+            dim=1,
+        )
+
+    # def _reward_termination(self):
+    #     # Terminal reward / penalty
+    #     return self.reset_buf * ~self.time_out_buf
+
+    # def _reward_dof_pos_limits(self):
+    #     # Penalize dof positions too close to the limit
+    #     out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
+    #     out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
+    #     return torch.sum(out_of_limits, dim=1)
+
+    # def _reward_feet_air_time(self):
+    #     # Reward long steps
+    #     contact = self.link_contact_forces[:, self.feet_link_indices, 2] > 1.
+    #     contact_filt = torch.logical_or(contact, self.last_contacts) 
+    #     self.last_contacts = contact
+    #     first_contact = (self.feet_air_time > 0.) * contact_filt
+    #     self.feet_air_time += self.dt
+    #     rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1) # reward only on first contact with the ground
+    #     rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1 #no reward for zero command
+    #     self.feet_air_time *= ~contact_filt
+    #     return rew_airTime
 
     # ------------ Camera and recording functions ----------------
     def _set_camera(self):

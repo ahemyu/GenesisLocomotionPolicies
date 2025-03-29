@@ -58,6 +58,7 @@ def get_train_cfg(exp_name, max_iterations):
 
 def get_cfgs():
     env_cfg = {
+        'links_to_keep': ['FL_foot', 'FR_foot', 'RL_foot', 'RR_foot',],
         "num_actions": 12,
         # joint/link names
         "default_joint_angles": {  # [rad]
@@ -87,7 +88,11 @@ def get_cfgs():
             "RL_hip_joint",
             "RL_thigh_joint",
             "RL_calf_joint",
-        ],
+        ],  
+        'termination_contact_link_names': ['base'],
+        'penalized_contact_link_names': ['base', 'thigh', 'calf'],
+        'feet_link_names': ['foot'],
+        'base_link_name': ['base'],
         # PD
         "kp": 20.0,
         "kd": 0.5,
@@ -97,7 +102,7 @@ def get_cfgs():
         # base pose
         "base_init_pos": [0.0, 0.0, 0.42],
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
-        "episode_length_s": 20.0,
+        "episode_length_s": 30.0,
         "resampling_time_s": 4.0,
         "action_scale": 0.25,
         "simulate_action_latency": True,
@@ -117,19 +122,21 @@ def get_cfgs():
         "base_height_target": 0.3,
         "feet_height_target": 0.075,
         "reward_scales": {
-            "tracking_lin_vel": 1.0,         # Reward for matching linear velocity
+            "tracking_lin_vel": 2.0,         # Reward for matching linear velocity
             "tracking_ang_vel": 0.2,         # Reward for matching angular velocity
             "lin_vel_z": -1.0,               # Penalty for vertical movement
-            "base_height": -50.0,            # Penalty for incorrect torso height
-            "action_rate": -0.005,           # Small penalty for rapid action changes
-            "similar_to_default": -0.1,      # Small penalty for joint positions far from default
+            "ang_vel_xy": -0.05,               # Penalty for angular velocity in x and y
+            "base_height": -20.0,            # Penalty for incorrect torso height
+            "action_rate": -0.001,           # penalty for rapid action changes
+            "collision": -1.,                # Penalty for collisions on of the penalized links (base, thigh, calf)
+            'orientation': 0.0,              # Penalty for non flat base orientation
         },
     }
     command_cfg = {
         "num_commands": 3,
-        "lin_vel_x_range": [0.5, 1.0],
-        "lin_vel_y_range": [0, 0],
-        "ang_vel_range": [0, 0],
+        "lin_vel_x_range": [1.0, 2.0],
+        "lin_vel_y_range": [-0.2, 0.2],
+        "ang_vel_range": [-0.1, 0.1],
     }
 
     return env_cfg, obs_cfg, reward_cfg, command_cfg
@@ -137,9 +144,9 @@ def get_cfgs():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="go2-running_test")
-    parser.add_argument("-B", "--num_envs", type=int, default=2)
-    parser.add_argument("--max_iterations", type=int, default=1)
+    parser.add_argument("-e", "--exp_name", type=str, default="go2-running_v3")
+    parser.add_argument("-B", "--num_envs", type=int, default=20000)
+    parser.add_argument("--max_iterations", type=int, default=1000)
     args = parser.parse_args()
 
     gs.init(logging_level="warning")
@@ -170,5 +177,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v3 -B 1 --max_iterations 1 
+python train_run.py -e testo -B 1 --max_iterations 1 
 """
