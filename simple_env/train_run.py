@@ -97,14 +97,14 @@ def get_cfgs():
         "kp": 20.0, 
         "kd": 0.5,
         # termination
-        "termination_if_roll_greater_than": 10,  # degree
-        "termination_if_pitch_greater_than": 10,
+        "termination_if_roll_greater_than": 15,  # degree
+        "termination_if_pitch_greater_than": 15,
         # base pose
         "base_init_pos": [0.0, 0.0, 0.42],
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 30.0,
         "resampling_time_s": 4.0,
-        "action_scale": 0.25,
+        "action_scale": 0.30,
         "simulate_action_latency": True,
         "clip_actions": 100.0,
     }
@@ -119,17 +119,19 @@ def get_cfgs():
     }
     reward_cfg = {
         "tracking_sigma": 0.5, # controls how quickly the reward falls off with increasing error
-        "base_height_target": 0.3,
-        "feet_height_target": 0.075,
+        "base_height_target": 0.35,
+        "feet_height_target": 0.1,
         "reward_scales": {
-            "tracking_lin_vel": 5.0, # Reward for matching linear velocity
+            "tracking_lin_vel": 3.0, # Reward for matching linear velocity
             "tracking_ang_vel": 0.2, # Reward for matching angular velocity
             "lin_vel_z": -0.05,      # Penalty for vertical movement
             "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
             "base_height": -10.0,    # Penalty for incorrect torso height
-            "action_rate": -0.001,   # penalty for rapid action changes
+            "action_rate": -0.0005,   # penalty for rapid action changes
             "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
-            'orientation': -5.0,      # Penalty for non flat base orientation
+            'orientation': -2.0,      # Penalty for non flat base orientation
+            "aerial_phase": 0.3,      # Reward periods when all feet are off the ground (aerial phase)
+            "stride_efficiency": 0.2, # Reward efficient strides - larger distance per step
         },
     }
     command_cfg = {
@@ -177,5 +179,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v4 -B 30000 --max_iterations 1000 
+python train_run.py -e go2-running_v5 -B 30000 --max_iterations 1000 
 """
