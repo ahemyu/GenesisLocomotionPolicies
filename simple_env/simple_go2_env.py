@@ -168,7 +168,7 @@ class Go2Env:
         )# not used for now
         self.foot_velocities = torch.ones(
             self.num_envs, len(self.feet_link_indices), 3, device=self.device, dtype=gs.tc_float,
-        )# not used for now
+        )
     
     def _resample_commands(self, envs_idx):
         self.commands[envs_idx, 0] = gs_rand_float(*self.command_cfg["lin_vel_x_range"], (len(envs_idx),), self.device)
@@ -213,8 +213,8 @@ class Go2Env:
 
         # check termination and reset
         self.reset_buf = self.episode_length_buf > self.max_episode_length# if we reached 1000 steps, we need to reset the environment
-        self.reset_buf |= torch.abs(self.base_euler[:, 1]) > self.env_cfg["termination_if_pitch_greater_than"]# if pitch(forward/backward tilt) is greater than 10 degrees, we need to reset the environment
-        self.reset_buf |= torch.abs(self.base_euler[:, 0]) > self.env_cfg["termination_if_roll_greater_than"]# if roll(side-to-side tilt) is greater than 10 degrees, we need to reset the environment
+        self.reset_buf |= torch.abs(self.base_euler[:, 1]) > self.env_cfg["termination_if_pitch_greater_than"]# if pitch(forward/backward tilt) is greater than x degrees, we need to reset the environment
+        self.reset_buf |= torch.abs(self.base_euler[:, 0]) > self.env_cfg["termination_if_roll_greater_than"]# if roll(side-to-side tilt) is greater than x degrees, we need to reset the environment
 
         time_out_idx = (self.episode_length_buf > self.max_episode_length).nonzero(as_tuple=False).flatten()# environments that have reached the max episode length
         self.extras["time_outs"] = torch.zeros_like(self.reset_buf, device=self.device, dtype=gs.tc_float)
@@ -354,17 +354,40 @@ class Go2Env:
             ),
             dim=1,
         )
-    def _reward_aerial_phase(self):
-        """Reward periods when all feet are off the ground (aerial phase)"""
-        # Check if any feet are in contact with ground
+    def _reward_diagonal_gait(self):
+        """Reward diagonal leg coordination (trotting gait) - FL with RR, and FR with RL"""
+        # Check which feet are in contact with ground
         feet_contact = torch.norm(
             self.link_contact_forces[:, self.feet_link_indices, :],
             dim=-1
         ) > 0.1
         
-        # Reward when no feet are in contact (all feet in air)
-        no_contact = (~torch.any(feet_contact, dim=1)).float()
-        return no_contact
+        FL_idx = 0  # Index in feet_link_indices for Front Left foot
+        FR_idx = 1  # Index in feet_link_indices for Front Right foot
+        RL_idx = 2  # Index in feet_link_indices for Rear Left foot
+        RR_idx = 3  # Index in feet_link_indices for Rear Right foot
+        
+        # Check diagonal coordination
+        # When FL and RR are both in contact or both in swing phase together
+        diagonal_pair1_synced = ((feet_contact[:, FL_idx] & feet_contact[:, RR_idx]) | 
+                                (~feet_contact[:, FL_idx] & ~feet_contact[:, RR_idx])).float()
+        
+        # When FR and RL are both in contact or both in swing phase together
+        diagonal_pair2_synced = ((feet_contact[:, FR_idx] & feet_contact[:, RL_idx]) | 
+                                (~feet_contact[:, FR_idx] & ~feet_contact[:, RL_idx])).float()
+        
+        # Average synchronization of both diagonal pairs
+        diagonal_sync = (diagonal_pair1_synced + diagonal_pair2_synced) / 2.0
+        
+        # Reward opposite phase between diagonal pairs (if one pair is in contact, the other should be in swing)
+        # This promotes alternating diagonal patterns
+        opposite_phase = torch.abs(
+            (feet_contact[:, FL_idx] | feet_contact[:, RR_idx]).float() - 
+            (feet_contact[:, FR_idx] | feet_contact[:, RL_idx]).float()
+        ) # TODO: might remove this as it feels redundant and is 0 most of the time
+        
+        # Combine rewards for diagonal synchronization and opposite phasing
+        return diagonal_sync * opposite_phase
 
     def _reward_stride_efficiency(self):
         """Reward efficient strides - larger distance per step"""
@@ -385,6 +408,12 @@ class Go2Env:
         
         # Average across all feet
         return torch.mean(foot_swing_vel, dim=1)
+    
+    def _reward_absolute_lin_vel(self):
+        # Reward absolute linear velocity (encourages speed in any direction)
+        # We take the norm of the horizontal velocity (x and y components)
+        absolute_velocity = torch.norm(self.base_lin_vel[:, :2], dim=1)
+        return absolute_velocity
 
 
     # ------------ Camera and recording functions ----------------

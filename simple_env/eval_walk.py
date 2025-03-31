@@ -56,5 +56,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk.py -e go2-running_v5 -r --ckpt 1000
+python eval_walk.py -e go2-running_v6 -r --ckpt 1000
 """
