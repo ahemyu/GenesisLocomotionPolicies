@@ -132,6 +132,19 @@ class Go2Env:
         )
         self.extras = dict()  # extra information for logging
 
+        # self.dof_pos_limits = torch.stack(self.robot.get_dofs_limit(self.motor_dofs), dim=1)
+        # self.torque_limits = self.robot.get_dofs_force_range(self.motor_dofs)[1]
+        # for i in range(self.dof_pos_limits.shape[0]):
+        #     # soft limits
+        #     m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
+        #     r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
+        #     self.dof_pos_limits[i, 0] = (
+        #         m - 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
+        #     )
+        #     self.dof_pos_limits[i, 1] = (
+        #         m + 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
+        #     )
+
 
         def find_link_indices(names):
             """Finds the indices of the links in the robot that match the given names."""
@@ -379,41 +392,27 @@ class Go2Env:
         # Average synchronization of both diagonal pairs
         diagonal_sync = (diagonal_pair1_synced + diagonal_pair2_synced) / 2.0
         
-        # Reward opposite phase between diagonal pairs (if one pair is in contact, the other should be in swing)
-        # This promotes alternating diagonal patterns
-        opposite_phase = torch.abs(
-            (feet_contact[:, FL_idx] | feet_contact[:, RR_idx]).float() - 
-            (feet_contact[:, FR_idx] | feet_contact[:, RL_idx]).float()
-        ) # TODO: might remove this as it feels redundant and is 0 most of the time
+        # # Reward opposite phase between diagonal pairs (if one pair is in contact, the other should be in swing)
+        # # This promotes alternating diagonal patterns
+        # opposite_phase = torch.abs(
+        #     (feet_contact[:, FL_idx] | feet_contact[:, RR_idx]).float() - 
+        #     (feet_contact[:, FR_idx] | feet_contact[:, RL_idx]).float()
+        # ) # TODO: might remove this as it feels redundant and is 0 most of the time
         
-        # Combine rewards for diagonal synchronization and opposite phasing
-        return diagonal_sync * opposite_phase
-
-    def _reward_stride_efficiency(self):
-        """Reward efficient strides - larger distance per step"""
-        # Check if feet are in contact with ground
-        feet_contact = torch.norm(
-            self.link_contact_forces[:, self.feet_link_indices, :],
-            dim=-1
-        ) > 0.1
-        
-        # Get horizontal velocity of each foot
-        foot_horizontal_vel = torch.norm(self.foot_velocities[:, :, :2], dim=-1)
-        
-        # Create a mask for feet that are not in contact (in swing phase)
-        swing_mask = (~feet_contact).float()
-        
-        # Multiply velocity by mask to zero out stance phase velocities
-        foot_swing_vel = foot_horizontal_vel * swing_mask
-        
-        # Average across all feet
-        return torch.mean(foot_swing_vel, dim=1)
+        # Combine rewards for diagonal synchronization
+        return diagonal_sync
     
     def _reward_absolute_lin_vel(self):
         # Reward absolute linear velocity (encourages speed in any direction)
         # We take the norm of the horizontal velocity (x and y components)
         absolute_velocity = torch.norm(self.base_lin_vel[:, :2], dim=1)
         return absolute_velocity
+
+    def _reward_dof_pos_limits(self):
+        # Penalize dof positions too close to the limit
+        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
+        out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
+        return torch.sum(out_of_limits, dim=1)
 
 
     # ------------ Camera and recording functions ----------------

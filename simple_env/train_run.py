@@ -40,7 +40,7 @@ def get_train_cfg(exp_name, max_iterations):
             "load_run": -1,
             "log_interval": 1,
             "max_iterations": max_iterations,
-            "num_steps_per_env": 50, #lenght of trajectories
+            "num_steps_per_env": 48, #lenght of trajectories
             "policy_class_name": "ActorCritic",
             "record_interval": -1,
             "resume": False,
@@ -118,6 +118,7 @@ def get_cfgs():
         },
     }
     reward_cfg = {
+        # 'soft_dof_pos_limit': 0.9, # soft limit for joint position
         "tracking_sigma": 0.4, # controls how quickly the reward falls off with increasing error
         "base_height_target": 0.35,
         "feet_height_target": 0.1,
@@ -126,12 +127,11 @@ def get_cfgs():
             "tracking_ang_vel": 0.2, # Reward for matching angular velocity
             "lin_vel_z": -0.05,      # Penalty for vertical movement
             "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
-            "base_height": -20.0,    # Penalty for incorrect torso height
+            "base_height": -10.0,    # Penalty for incorrect torso height
             "action_rate": -0.005,   # penalty for rapid action changes
             "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
             'orientation': -2.0,      # Penalty for non flat base orientation
-            "stride_efficiency": 0.2, # Reward efficient strides - larger distance per step
-            "diagonal_gait": 0.2,      # Reward for diagonal gait
+            "diagonal_gait": 0.0,      # Reward for diagonal gait
             "absolute_lin_vel": 1.0 , # Reward for absolute linear velocity
 
         },
@@ -149,7 +149,7 @@ def get_cfgs():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--exp_name", type=str, default="go2-running_v7")
-    parser.add_argument("-B", "--num_envs", type=int, default=10)
+    parser.add_argument("-B", "--num_envs", type=int, default=1)
     parser.add_argument("--max_iterations", type=int, default=1)
     parser.add_argument('--resume', type=str, default=None)
     # parser.add_argument('--ckpt', type=int, default=1000)
@@ -176,7 +176,7 @@ def main():
         resume_path = os.path.join(resume_dir, f'model_{args.ckpt}.pt')
         print('==> resume training from', resume_path)
         runner.load(resume_path)
-        
+
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg],
         open(f"{log_dir}/cfgs.pkl", "wb"),
@@ -188,5 +188,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v7 -B 3000 --max_iterations 1 
+python train_run.py -e go2-running_v8 -B 8192 --max_iterations 1000 
 """
