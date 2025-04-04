@@ -17,7 +17,7 @@ class Go2Env:
 
         self.num_envs: int = num_envs
         self.num_obs: int = obs_cfg["num_obs"] #48
-        self.num_privileged_obs = None
+        self.num_privileged_obs = None # for policy_runner
         self.num_actions: int = env_cfg["num_actions"]#12
         self.num_commands: int = command_cfg["num_commands"]#3
 
@@ -132,19 +132,18 @@ class Go2Env:
         )
         self.extras = dict()  # extra information for logging
 
-        # self.dof_pos_limits = torch.stack(self.robot.get_dofs_limit(self.motor_dofs), dim=1)
-        # self.torque_limits = self.robot.get_dofs_force_range(self.motor_dofs)[1]
-        # for i in range(self.dof_pos_limits.shape[0]):
-        #     # soft limits
-        #     m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
-        #     r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
-        #     self.dof_pos_limits[i, 0] = (
-        #         m - 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
-        #     )
-        #     self.dof_pos_limits[i, 1] = (
-        #         m + 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
-        #     )
-
+        self.dof_pos_limits = torch.stack(self.robot.get_dofs_limit(self.motor_dofs), dim=1)
+        self.torque_limits = self.robot.get_dofs_force_range(self.motor_dofs)[1]
+        for i in range(self.dof_pos_limits.shape[0]):
+            # soft limits
+            m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
+            r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
+            self.dof_pos_limits[i, 0] = (
+                m - 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
+            )
+            self.dof_pos_limits[i, 1] = (
+                m + 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
+            )
 
         def find_link_indices(names):
             """Finds the indices of the links in the robot that match the given names."""
@@ -367,40 +366,6 @@ class Go2Env:
             ),
             dim=1,
         )
-    def _reward_diagonal_gait(self):
-        """Reward diagonal leg coordination (trotting gait) - FL with RR, and FR with RL"""
-        # Check which feet are in contact with ground
-        feet_contact = torch.norm(
-            self.link_contact_forces[:, self.feet_link_indices, :],
-            dim=-1
-        ) > 0.1
-        
-        FL_idx = 0  # Index in feet_link_indices for Front Left foot
-        FR_idx = 1  # Index in feet_link_indices for Front Right foot
-        RL_idx = 2  # Index in feet_link_indices for Rear Left foot
-        RR_idx = 3  # Index in feet_link_indices for Rear Right foot
-        
-        # Check diagonal coordination
-        # When FL and RR are both in contact or both in swing phase together
-        diagonal_pair1_synced = ((feet_contact[:, FL_idx] & feet_contact[:, RR_idx]) | 
-                                (~feet_contact[:, FL_idx] & ~feet_contact[:, RR_idx])).float()
-        
-        # When FR and RL are both in contact or both in swing phase together
-        diagonal_pair2_synced = ((feet_contact[:, FR_idx] & feet_contact[:, RL_idx]) | 
-                                (~feet_contact[:, FR_idx] & ~feet_contact[:, RL_idx])).float()
-        
-        # Average synchronization of both diagonal pairs
-        diagonal_sync = (diagonal_pair1_synced + diagonal_pair2_synced) / 2.0
-        
-        # # Reward opposite phase between diagonal pairs (if one pair is in contact, the other should be in swing)
-        # # This promotes alternating diagonal patterns
-        # opposite_phase = torch.abs(
-        #     (feet_contact[:, FL_idx] | feet_contact[:, RR_idx]).float() - 
-        #     (feet_contact[:, FR_idx] | feet_contact[:, RL_idx]).float()
-        # ) # TODO: might remove this as it feels redundant and is 0 most of the time
-        
-        # Combine rewards for diagonal synchronization
-        return diagonal_sync
     
     def _reward_absolute_lin_vel(self):
         # Reward absolute linear velocity (encourages speed in any direction)
@@ -413,6 +378,12 @@ class Go2Env:
         out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
         return torch.sum(out_of_limits, dim=1)
+    
+    def _reward_dof_acc(self):
+        # Penalize dof accelerations
+        return torch.sum(
+            torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1
+        )
 
 
     # ------------ Camera and recording functions ----------------
