@@ -40,14 +40,14 @@ def get_train_cfg(exp_name, max_iterations):
             "load_run": -1,
             "log_interval": 1,
             "max_iterations": max_iterations,
-            "num_steps_per_env": 24,
+            "num_steps_per_env": 48, #lenght of trajectories
             "policy_class_name": "ActorCritic",
             "record_interval": -1,
             "resume": False,
             "resume_path": None,
             "run_name": "",
             "runner_class_name": "runner_class_name",
-            "save_interval": 1000,
+            "save_interval": 500,
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1,
@@ -118,7 +118,8 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        "tracking_sigma": 0.5, # controls how quickly the reward falls off with increasing error
+        # 'soft_dof_pos_limit': 0.9, # soft limit for joint position
+        "tracking_sigma": 0.4, # controls how quickly the reward falls off with increasing error
         "base_height_target": 0.35,
         "feet_height_target": 0.1,
         "reward_scales": {
@@ -127,16 +128,17 @@ def get_cfgs():
             "lin_vel_z": -0.05,      # Penalty for vertical movement
             "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
             "base_height": -10.0,    # Penalty for incorrect torso height
-            "action_rate": -0.0005,   # penalty for rapid action changes
+            "action_rate": -0.005,   # penalty for rapid action changes
             "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
             'orientation': -2.0,      # Penalty for non flat base orientation
-            "aerial_phase": 0.3,      # Reward periods when all feet are off the ground (aerial phase)
-            "stride_efficiency": 0.2, # Reward efficient strides - larger distance per step
+            "diagonal_gait": 0.0,      # Reward for diagonal gait
+            "absolute_lin_vel": 1.0 , # Reward for absolute linear velocity
+
         },
     }
     command_cfg = {
         "num_commands": 3,
-        "lin_vel_x_range": [1.0, 3.0],
+        "lin_vel_x_range": [1.0, 4.0],
         "lin_vel_y_range": [0, 0],
         "ang_vel_range": [0, 0],
     }
@@ -146,9 +148,11 @@ def get_cfgs():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="go2-running_v3")
-    parser.add_argument("-B", "--num_envs", type=int, default=20000)
-    parser.add_argument("--max_iterations", type=int, default=1000)
+    parser.add_argument("-e", "--exp_name", type=str, default="go2-running_v7")
+    parser.add_argument("-B", "--num_envs", type=int, default=1)
+    parser.add_argument("--max_iterations", type=int, default=1)
+    parser.add_argument('--resume', type=str, default=None)
+    # parser.add_argument('--ckpt', type=int, default=1000)
     args = parser.parse_args()
 
     gs.init(logging_level="warning")
@@ -167,17 +171,22 @@ def main():
 
     runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
 
+    if args.resume is not None:
+        resume_dir = f'logs/{args.resume}'
+        resume_path = os.path.join(resume_dir, f'model_{args.ckpt}.pt')
+        print('==> resume training from', resume_path)
+        runner.load(resume_path)
+
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg],
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
-
-    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True) #setting init_at_random_ep_len to True will cause each 
 
 
 if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v5 -B 30000 --max_iterations 1000 
+python train_run.py -e go2-running_v8 -B 8192 --max_iterations 1000 
 """
