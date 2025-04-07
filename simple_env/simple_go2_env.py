@@ -364,26 +364,26 @@ class Go2Env:
                 )
                 > 0.1
             ),
+    
             dim=1,
         )
-    
     def _reward_absolute_lin_vel(self):
         # Reward absolute linear velocity (encourages speed in any direction)
         # We take the norm of the horizontal velocity (x and y components)
         absolute_velocity = torch.norm(self.base_lin_vel[:, :2], dim=1)
         return absolute_velocity
 
-    def _reward_dof_pos_limits(self):
-        # Penalize dof positions too close to the limit
-        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
-        out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
-        return torch.sum(out_of_limits, dim=1)
+    # def _reward_dof_pos_limits(self):
+    #     # Penalize dof positions too close to the limit
+    #     out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
+    #     out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
+    #     return torch.sum(out_of_limits, dim=1)
     
-    def _reward_dof_acc(self):
-        # Penalize dof accelerations
-        return torch.sum(
-            torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1
-        )
+    # def _reward_dof_acc(self):
+    #     # Penalize dof accelerations
+    #     return torch.sum(
+    #         torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1
+    #     )
 
 
     # ------------ Camera and recording functions ----------------

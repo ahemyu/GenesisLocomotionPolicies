@@ -104,7 +104,7 @@ def get_cfgs():
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 30.0,
         "resampling_time_s": 4.0,
-        "action_scale": 0.30,
+        "action_scale": 0.30, # controls maximum angular deviation from the default joint positions
         "simulate_action_latency": True,
         "clip_actions": 100.0,
     }
@@ -131,7 +131,6 @@ def get_cfgs():
             "action_rate": -0.005,   # penalty for rapid action changes
             "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
             'orientation': -2.0,      # Penalty for non flat base orientation
-            "diagonal_gait": 0.0,      # Reward for diagonal gait
             "absolute_lin_vel": 1.0 , # Reward for absolute linear velocity
 
         },

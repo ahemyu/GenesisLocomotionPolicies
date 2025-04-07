@@ -47,8 +47,8 @@ def main():
             obs, _, rews, dones, infos = env.step(actions)
             n_frames += 1
             if args.record:
-                if n_frames == 300:
-                    env.stop_recording("go2_running_v7.mp4")
+                if n_frames == 500:
+                    env.stop_recording("go2_running_final.mp4")
                     exit()
 
 
