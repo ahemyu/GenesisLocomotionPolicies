@@ -131,19 +131,19 @@ class Go2Env:
             (self.num_envs, self.robot.n_links, 3), device=self.device, dtype=gs.tc_float
         )
         self.extras = dict()  # extra information for logging
-
-        self.dof_pos_limits = torch.stack(self.robot.get_dofs_limit(self.motor_dofs), dim=1)
-        self.torque_limits = self.robot.get_dofs_force_range(self.motor_dofs)[1]
-        for i in range(self.dof_pos_limits.shape[0]):
-            # soft limits
-            m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
-            r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
-            self.dof_pos_limits[i, 0] = (
-                m - 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
-            )
-            self.dof_pos_limits[i, 1] = (
-                m + 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
-            )
+        ## not used for now ##
+        # self.dof_pos_limits = torch.stack(self.robot.get_dofs_limit(self.motor_dofs), dim=1)
+        # self.torque_limits = self.robot.get_dofs_force_range(self.motor_dofs)[1]
+        # for i in range(self.dof_pos_limits.shape[0]):
+        #     # soft limits
+        #     m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
+        #     r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
+        #     self.dof_pos_limits[i, 0] = (
+        #         m - 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
+        #     )
+        #     self.dof_pos_limits[i, 1] = (
+        #         m + 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
+        #     )
 
         def find_link_indices(names):
             """Finds the indices of the links in the robot that match the given names."""

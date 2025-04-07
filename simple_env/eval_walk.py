@@ -6,7 +6,6 @@ from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
 from simple_go2_env import Go2Env
 
-### GPU VERSION ###
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--exp_name", type=str, default="go2-walking")
@@ -35,6 +34,7 @@ def main():
     runner.load(resume_path)
     policy = runner.get_inference_policy(device="cuda:0")
 
+    ### recording ###
     env.reset()
     obs = env.get_observations()
     with torch.no_grad():
@@ -47,7 +47,7 @@ def main():
             obs, _, rews, dones, infos = env.step(actions)
             n_frames += 1
             if args.record:
-                if n_frames == 500:
+                if n_frames == 300:
                     env.stop_recording("go2_running_final.mp4")
                     exit()
 
