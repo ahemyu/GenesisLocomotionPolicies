@@ -2,13 +2,11 @@ import argparse
 import os
 import pickle
 import shutil
-
-from simple_go2_env import Go2Env
+from simple_reward_wrapper import WalkUneven
 from rsl_rl.runners import OnPolicyRunner
-
 import genesis as gs
 
-
+ 
 def get_train_cfg(exp_name, max_iterations):
 
     train_cfg_dict = {
@@ -40,14 +38,14 @@ def get_train_cfg(exp_name, max_iterations):
             "load_run": -1,
             "log_interval": 1,
             "max_iterations": max_iterations,
-            "num_steps_per_env": 48, #maybe set higher
+            "num_steps_per_env": 96,
             "policy_class_name": "ActorCritic",
             "record_interval": -1,
             "resume": False,
             "resume_path": None,
             "run_name": "",
             "runner_class_name": "runner_class_name",
-            "save_interval": 1,
+            "save_interval": 100,
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1,
@@ -93,8 +91,8 @@ def get_cfgs():
         "kp": 20.0,
         "kd": 0.5,
         # termination
-        "termination_if_roll_greater_than": 50,  # degree
-        "termination_if_pitch_greater_than": 50,
+        "termination_if_roll_greater_than": 20,  # degree
+        "termination_if_pitch_greater_than": 10,
         # base pose
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 30.0,
@@ -129,18 +127,19 @@ def get_cfgs():
         "tracking_sigma": 0.40,# controls how quickly the reward falls off with increasing error
         "reward_scales": {
             "tracking_lin_vel": 1.0,         # Reward for matching linear velocity
+            "lin_vel_z": -0.1,           # Penalty for z axis base linear velocity
             # "tracking_ang_vel": 0.2,         # Reward for matching angular velocity
             "action_rate": -0.005,           # Small penalty for rapid action changes
-            "absolute_lin_vel": 0.5,       # Reward for absolute linear velocity
             "orientation": -0.01,          # Penalty for orientation not parallel to terrain
             "collision": -1.0,            # Penalty for collision
         },
     }
+    # TODO: Change this completely as this doesn't really make sense for this task
     command_cfg = {
         "num_commands": 3,
-        "lin_vel_x_range": [0.5, 2.0],
-        "lin_vel_y_range": [0, 0.2],
-        "ang_vel_range": [0, 0.5],
+        "lin_vel_x_range": [1.0, 1.0],# just remove this 
+        "lin_vel_y_range": [0, 0],
+        "ang_vel_range": [0, 0],
     }
 
     return env_cfg, obs_cfg, reward_cfg, command_cfg
@@ -163,7 +162,7 @@ def main():
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
-    env = Go2Env(
+    env = WalkUneven(
         num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg, command_cfg=command_cfg
     )
 

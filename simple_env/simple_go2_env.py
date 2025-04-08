@@ -18,14 +18,16 @@ class Go2Env:
         self.num_envs: int = num_envs
         self.num_obs: int = obs_cfg["num_obs"] #48
         self.num_privileged_obs = None # for policy_runner
-        self.num_actions: int = env_cfg["num_actions"]#12
-        self.num_commands: int = command_cfg["num_commands"]#3
+        self.num_actions: int = env_cfg["num_actions"] #12
+        self.num_commands: int = command_cfg["num_commands"] #3
 
         self.simulate_action_latency: bool = True  # there is a 1 step latency on real robot
         self.dt: float = 0.02  # control frequency on real robot is 50hz
         self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 30/0.02 = 1500 steps
 
+
         self.env_cfg: dict = env_cfg
+        self.use_terrain = self.env_cfg.get('use_terrain', False)
         self.obs_cfg: dict = obs_cfg
         self.reward_cfg: dict = reward_cfg
         self.command_cfg: dict = command_cfg
@@ -62,7 +64,7 @@ class Go2Env:
                 continue
             self.rigid_solver = solver
 
-        if self.env_cfg['use_terrain']:
+        if self.use_terrain:
             self.terrain_cfg = self.env_cfg['terrain_cfg']
             self.terrain = self.scene.add_entity(
                 gs.morphs.Terrain(
@@ -82,7 +84,7 @@ class Go2Env:
             self.height_field = torch.tensor(
                 height_field, device=self.device, dtype=gs.tc_float
             ) * self.terrain_cfg['vertical_scale']
-            self.base_init_pos = torch.tensor([6.0, 6.0, 0.2], device=self.device) # start in the middle of first terrain 
+            self.base_init_pos = torch.tensor([6.0, 6.0, -0.3], device=self.device) # start in the middle of first terrain 
 
         else:
             self.scene.add_entity(
@@ -132,7 +134,8 @@ class Go2Env:
         self.rew_buf = torch.zeros((self.num_envs,), device=self.device, dtype=gs.tc_float)
         self.reset_buf = torch.ones((self.num_envs,), device=self.device, dtype=gs.tc_int)
         self.episode_length_buf = torch.zeros((self.num_envs,), device=self.device, dtype=gs.tc_int)# buffer to store episode length for each environment
-        self.commands = torch.zeros((self.num_envs, self.num_commands), device=self.device, dtype=gs.tc_float)
+        self.commands = torch.zeros((self.num_envs, self.num_commands
+        ), device=self.device, dtype=gs.tc_float)
         self.commands_scale = torch.tensor(
             [self.obs_scales["lin_vel"], self.obs_scales["lin_vel"], self.obs_scales["ang_vel"]],
             device=self.device,
@@ -155,7 +158,7 @@ class Go2Env:
         )
         self.extras = dict()  # extra information for logging
         
-        if self.env_cfg['use_terrain']:
+        if self.use_terrain:
             clipped_base_pos = self.base_pos[:, :2].clamp(min=torch.zeros(2, device=self.device), max=self.terrain_margin)
             height_field_ids = (clipped_base_pos / self.terrain_cfg['horizontal_scale'] - 0.5).floor().int()
             height_field_ids.clamp(min=0)
@@ -233,7 +236,7 @@ class Go2Env:
         )# net force applied on each links due to direct external contacts, shape (num_envs, num_links, 3)
         # resample commands
         envs_idx = (
-            (self.episode_length_buf % int(self.env_cfg["resampling_time_s"] / self.dt) == 0)
+            (self.episode_length_buf % int(self.env_cfg["resampling_time_s"] / self.dt) == 0) #TODO: maybe adjust this (might not be needed to resample commands at all)
             .nonzero(as_tuple=False)
             .flatten()
         ) # will contain the indices of all environments that have reached a multiple of 200 timesteps, and thus need resampling
@@ -243,6 +246,13 @@ class Go2Env:
         self.reset_buf = self.episode_length_buf > self.max_episode_length# if we reached 1000 steps, we need to reset the environment
         self.reset_buf |= torch.abs(self.base_euler[:, 1]) > self.env_cfg["termination_if_pitch_greater_than"]# if pitch(forward/backward tilt) is greater than x degrees, we need to reset the environment
         self.reset_buf |= torch.abs(self.base_euler[:, 0]) > self.env_cfg["termination_if_roll_greater_than"]# if roll(side-to-side tilt) is greater than x degrees, we need to reset the environment
+        
+        if self.use_terrain:
+            # Reset if robot goes outside the terrain boundaries
+            self.reset_buf |= (self.base_pos[:, 0] < 0.2)  # X min boundary
+            self.reset_buf |= (self.base_pos[:, 1] < 0.2)  # Y min boundary
+            self.reset_buf |= (self.base_pos[:, 0] > self.terrain_margin[0] - 0.1)  # X max boundary
+            self.reset_buf |= (self.base_pos[:, 1] > self.terrain_margin[1] - 0.1)  # Y max boundary
 
         time_out_idx = (self.episode_length_buf > self.max_episode_length).nonzero(as_tuple=False).flatten()# environments that have reached the max episode length
         self.extras["time_outs"] = torch.zeros_like(self.reset_buf, device=self.device, dtype=gs.tc_float)
@@ -258,6 +268,10 @@ class Go2Env:
             self.episode_sums[name] += rew
 
         # compute observations
+        # TODO: add terrain height and base height to observations(?)
+        # we can get the base height with self.robot.get_pos()
+
+        # I think  the terrain height information is best given as privileged observation to the critic network  
         self.obs_buf = torch.cat(
             [
                 self.base_lin_vel * self.obs_scales["lin_vel"],  # 3, the robot's linear velocity in its base frame(3d)
@@ -307,7 +321,6 @@ class Go2Env:
         self.base_lin_vel[envs_idx] = 0
         self.base_ang_vel[envs_idx] = 0
         self.robot.zero_all_dofs_velocity(envs_idx)
-
         # reset buffers
         self.last_actions[envs_idx] = 0.0
         self.last_dof_vel[envs_idx] = 0.0
@@ -328,57 +341,7 @@ class Go2Env:
         self.reset_buf[:] = True
         self.reset_idx(torch.arange(self.num_envs, device=self.device))
         return self.obs_buf, None
-
-    # ------------ reward functions---------------
-    def _reward_tracking_lin_vel(self):
-        # Tracking of linear velocity commands (xy axes)
-        lin_vel_error = torch.sum(
-            torch.square(
-                self.commands[:, :2] - self.base_lin_vel[:, :2]
-            ),
-            dim=1,
-        )
-        return torch.exp(-lin_vel_error / self.reward_cfg['tracking_sigma'])
-
-    # def _reward_tracking_ang_vel(self):
-    #     # Tracking of angular velocity commands (yaw)
-    #     ang_vel_error = torch.square(
-    #         self.commands[:, 2] - self.base_ang_vel[:, 2]
-    #     )
-    #     return torch.exp(-ang_vel_error / self.reward_cfg['tracking_sigma'])
-
-    # def _reward_ang_vel_xy(self):
-    #     # Penalize xy axes base angular velocity
-    #     return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
-
-    def _reward_orientation(self):
-        # Penalize non flat base orientation
-        return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
-
-    def _reward_action_rate(self):
-        # Penalize changes in actions
-        return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
     
-    def _reward_collision(self):
-        # Penalize collisions on selected bodies
-        return torch.sum(
-            1.0
-            * (
-                torch.norm(
-                    self.link_contact_forces[:, self.penalized_contact_link_indices, :],
-                    dim=-1,
-                )
-                > 0.1
-            ),
-    
-            dim=1,
-        )
-    def _reward_absolute_lin_vel(self):
-        # Reward absolute linear velocity (encourages speed in any direction)
-        # We take the norm of the horizontal velocity (x and y components)
-        absolute_velocity = torch.norm(self.base_lin_vel[:, :2], dim=1)
-        return absolute_velocity
-
     # ------------ Camera and recording functions ----------------
     def _set_camera(self):
         '''Set camera position and direction for recording'''
@@ -387,12 +350,12 @@ class Go2Env:
             lookat=np.array([0, 0, 0.1]),    # Looking at the robot
             fov=45,                          # Changed from 40
             GUI=False,
-            res=(1280, 720),               # Resolution of the camera
+            res=(720, 720),               # Resolution of the camera
         )
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 300:
+        if self._recording and len(self._recorded_frames) < 800:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
                 pos=robot_pos + np.array([-1.5, 0.0, 1.2]),  # Position camera behind and above robot
@@ -403,7 +366,7 @@ class Go2Env:
 
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
-        if len(self._recorded_frames) == 300:
+        if len(self._recorded_frames) == 600:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False
