@@ -23,7 +23,7 @@ class Go2Env:
 
         self.simulate_action_latency: bool = True  # there is a 1 step latency on real robot
         self.dt: float = 0.02  # control frequency on real robot is 50hz
-        self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 20/0.02 = 1000 steps
+        self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 30/0.02 = 1500 steps
 
         self.env_cfg: dict = env_cfg
         self.obs_cfg: dict = obs_cfg
@@ -62,11 +62,35 @@ class Go2Env:
                 continue
             self.rigid_solver = solver
 
-        # add plane
-        self.scene.add_entity(gs.morphs.URDF(file="urdf/plane/plane.urdf", fixed=True))
+        if self.env_cfg['use_terrain']:
+            self.terrain_cfg = self.env_cfg['terrain_cfg']
+            self.terrain = self.scene.add_entity(
+                gs.morphs.Terrain(
+                    n_subterrains=self.terrain_cfg['n_subterrains'],
+                    horizontal_scale=self.terrain_cfg['horizontal_scale'],
+                    vertical_scale=self.terrain_cfg['vertical_scale'],
+                    subterrain_size=self.terrain_cfg['subterrain_size'],
+                    subterrain_types=self.terrain_cfg['subterrain_types'],
+                ),
+            )
+            terrain_margin_x = self.terrain_cfg['n_subterrains'][0] * self.terrain_cfg['subterrain_size'][0]
+            terrain_margin_y = self.terrain_cfg['n_subterrains'][1] * self.terrain_cfg['subterrain_size'][1]
+            self.terrain_margin = torch.tensor(
+                [terrain_margin_x, terrain_margin_y], device=self.device, dtype=gs.tc_float
+            )
+            height_field = self.terrain.geoms[0].metadata["height_field"] # (144, 144) why???
+            self.height_field = torch.tensor(
+                height_field, device=self.device, dtype=gs.tc_float
+            ) * self.terrain_cfg['vertical_scale']
+            self.base_init_pos = torch.tensor([6.0, 6.0, 0.2], device=self.device) # start in the middle of first terrain 
+
+        else:
+            self.scene.add_entity(
+            gs.morphs.URDF(file='urdf/plane/plane.urdf', fixed=True),
+        )
+            self.base_init_pos = torch.tensor(self.env_cfg["base_init_pos"], device=self.device)
 
         # add robot
-        self.base_init_pos = torch.tensor(self.env_cfg["base_init_pos"], device=self.device)
         self.base_init_quat = torch.tensor(self.env_cfg["base_init_quat"], device=self.device)
         self.inv_base_init_quat = inv_quat(self.base_init_quat) # inverse of the initial orientation quaternion of the robot's base
         self.robot: RigidEntity  = self.scene.add_entity(
@@ -78,7 +102,6 @@ class Go2Env:
             ),
         )
 
-    
         self._set_camera()
 
         # build
@@ -131,19 +154,12 @@ class Go2Env:
             (self.num_envs, self.robot.n_links, 3), device=self.device, dtype=gs.tc_float
         )
         self.extras = dict()  # extra information for logging
-        ## not used for now ##
-        # self.dof_pos_limits = torch.stack(self.robot.get_dofs_limit(self.motor_dofs), dim=1)
-        # self.torque_limits = self.robot.get_dofs_force_range(self.motor_dofs)[1]
-        # for i in range(self.dof_pos_limits.shape[0]):
-        #     # soft limits
-        #     m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
-        #     r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
-        #     self.dof_pos_limits[i, 0] = (
-        #         m - 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
-        #     )
-        #     self.dof_pos_limits[i, 1] = (
-        #         m + 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
-        #     )
+        
+        if self.env_cfg['use_terrain']:
+            clipped_base_pos = self.base_pos[:, :2].clamp(min=torch.zeros(2, device=self.device), max=self.terrain_margin)
+            height_field_ids = (clipped_base_pos / self.terrain_cfg['horizontal_scale'] - 0.5).floor().int()
+            height_field_ids.clamp(min=0)
+            self.terrain_heights = self.height_field[height_field_ids[:, 0], height_field_ids[:, 1]]
 
         def find_link_indices(names):
             """Finds the indices of the links in the robot that match the given names."""
@@ -181,7 +197,7 @@ class Go2Env:
         self.foot_velocities = torch.ones(
             self.num_envs, len(self.feet_link_indices), 3, device=self.device, dtype=gs.tc_float,
         )
-    
+
     def _resample_commands(self, envs_idx):
         self.commands[envs_idx, 0] = gs_rand_float(*self.command_cfg["lin_vel_x_range"], (len(envs_idx),), self.device)
         self.commands[envs_idx, 1] = gs_rand_float(*self.command_cfg["lin_vel_y_range"], (len(envs_idx),), self.device)
@@ -284,7 +300,7 @@ class Go2Env:
         )
 
         # reset base
-        self.base_pos[envs_idx] = self.base_init_pos
+        self.base_pos[envs_idx] = self.base_init_pos 
         self.base_quat[envs_idx] = self.base_init_quat.reshape(1, -1)
         self.robot.set_pos(self.base_pos[envs_idx], zero_velocity=False, envs_idx=envs_idx)
         self.robot.set_quat(self.base_quat[envs_idx], zero_velocity=False, envs_idx=envs_idx)
@@ -324,20 +340,16 @@ class Go2Env:
         )
         return torch.exp(-lin_vel_error / self.reward_cfg['tracking_sigma'])
 
-    def _reward_tracking_ang_vel(self):
-        # Tracking of angular velocity commands (yaw)
-        ang_vel_error = torch.square(
-            self.commands[:, 2] - self.base_ang_vel[:, 2]
-        )
-        return torch.exp(-ang_vel_error / self.reward_cfg['tracking_sigma'])
+    # def _reward_tracking_ang_vel(self):
+    #     # Tracking of angular velocity commands (yaw)
+    #     ang_vel_error = torch.square(
+    #         self.commands[:, 2] - self.base_ang_vel[:, 2]
+    #     )
+    #     return torch.exp(-ang_vel_error / self.reward_cfg['tracking_sigma'])
 
-    def _reward_lin_vel_z(self):
-        # Penalize z axis base linear velocity
-        return torch.square(self.base_lin_vel[:, 2])
-
-    def _reward_ang_vel_xy(self):
-        # Penalize xy axes base angular velocity
-        return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
+    # def _reward_ang_vel_xy(self):
+    #     # Penalize xy axes base angular velocity
+    #     return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
 
     def _reward_orientation(self):
         # Penalize non flat base orientation
@@ -346,13 +358,7 @@ class Go2Env:
     def _reward_action_rate(self):
         # Penalize changes in actions
         return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
-
-    def _reward_base_height(self):
-        # Penalize base height away from target
-        base_height = self.base_pos[:, 2]
-        base_height_target = self.reward_cfg['base_height_target']
-        return torch.square(base_height - base_height_target)
-
+    
     def _reward_collision(self):
         # Penalize collisions on selected bodies
         return torch.sum(
@@ -373,43 +379,31 @@ class Go2Env:
         absolute_velocity = torch.norm(self.base_lin_vel[:, :2], dim=1)
         return absolute_velocity
 
-    # def _reward_dof_pos_limits(self):
-    #     # Penalize dof positions too close to the limit
-    #     out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
-    #     out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
-    #     return torch.sum(out_of_limits, dim=1)
-    
-    # def _reward_dof_acc(self):
-    #     # Penalize dof accelerations
-    #     return torch.sum(
-    #         torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1
-    #     )
-
-
     # ------------ Camera and recording functions ----------------
     def _set_camera(self):
         '''Set camera position and direction for recording'''
         self._floating_camera = self.scene.add_camera(
-            pos=np.array([0, -1, 1]),
-            lookat=np.array([0, 0, 0]),
-            fov=40,
+            pos=np.array([-1.5, 0.0, 1.2]),  # Behind and elevated
+            lookat=np.array([0, 0, 0.1]),    # Looking at the robot
+            fov=45,                          # Changed from 40
             GUI=False,
+            res=(1280, 720),               # Resolution of the camera
         )
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 150:
+        if self._recording and len(self._recorded_frames) < 300:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
-                pos=robot_pos + np.array([-1, -1, 0.5]), 
-                lookat=robot_pos + np.array([0, 0, -0.1])
+                pos=robot_pos + np.array([-1.5, 0.0, 1.2]),  # Position camera behind and above robot
+                lookat=robot_pos + np.array([0.3, 0, 0.1])   # Look slightly ahead of the robot
             )
             frame, _, _, _ = self._floating_camera.render()
             self._recorded_frames.append(frame)
 
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
-        if len(self._recorded_frames) == 150:
+        if len(self._recorded_frames) == 300:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False
