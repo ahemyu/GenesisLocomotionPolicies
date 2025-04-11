@@ -12,14 +12,13 @@ def gs_rand_float(lower, upper, shape, device):
 
 
 class Go2Env:
-    def __init__(self, num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg, show_viewer=False, device="cuda"):
+    def __init__(self, num_envs, env_cfg, obs_cfg, reward_cfg, show_viewer=False, device="cuda"):
         self.device = torch.device(device)
 
         self.num_envs: int = num_envs
-        self.num_obs: int = obs_cfg["num_obs"] #48
-        self.num_privileged_obs = None # for policy_runner
+        self.num_obs: int = obs_cfg["num_obs"] #45
+        self.num_privileged_obs: int = obs_cfg.get("num_priviliged_obs", None)  # privileged informations only for trainig for the critic network 
         self.num_actions: int = env_cfg["num_actions"] #12
-        self.num_commands: int = command_cfg["num_commands"] #3
 
         self.simulate_action_latency: bool = True  # there is a 1 step latency on real robot
         self.dt: float = 0.02  # control frequency on real robot is 50hz
@@ -30,8 +29,6 @@ class Go2Env:
         self.use_terrain = self.env_cfg.get('use_terrain', False)
         self.obs_cfg: dict = obs_cfg
         self.reward_cfg: dict = reward_cfg
-        self.command_cfg: dict = command_cfg
-
         self.obs_scales: dict = obs_cfg["obs_scales"]
         self.reward_scales: dict = reward_cfg["reward_scales"]
         
@@ -131,16 +128,18 @@ class Go2Env:
             self.num_envs, 1
         )
         self.obs_buf = torch.zeros((self.num_envs, self.num_obs), device=self.device, dtype=gs.tc_float)
+        self.privileged_obs_buf = (
+            None
+            if self.num_privileged_obs is None
+            else torch.zeros(
+                (self.num_envs, self.num_privileged_obs),
+                device=self.device,
+                dtype=gs.tc_float,
+            )
+        )
         self.rew_buf = torch.zeros((self.num_envs,), device=self.device, dtype=gs.tc_float)
         self.reset_buf = torch.ones((self.num_envs,), device=self.device, dtype=gs.tc_int)
         self.episode_length_buf = torch.zeros((self.num_envs,), device=self.device, dtype=gs.tc_int)# buffer to store episode length for each environment
-        self.commands = torch.zeros((self.num_envs, self.num_commands
-        ), device=self.device, dtype=gs.tc_float)
-        self.commands_scale = torch.tensor(
-            [self.obs_scales["lin_vel"], self.obs_scales["lin_vel"], self.obs_scales["ang_vel"]],
-            device=self.device,
-            dtype=gs.tc_float,
-        )
         self.actions = torch.zeros((self.num_envs, self.num_actions), device=self.device, dtype=gs.tc_float)
         self.last_actions = torch.zeros_like(self.actions)
         self.dof_pos = torch.zeros_like(self.actions)
@@ -201,11 +200,6 @@ class Go2Env:
             self.num_envs, len(self.feet_link_indices), 3, device=self.device, dtype=gs.tc_float,
         )
 
-    def _resample_commands(self, envs_idx):
-        self.commands[envs_idx, 0] = gs_rand_float(*self.command_cfg["lin_vel_x_range"], (len(envs_idx),), self.device)
-        self.commands[envs_idx, 1] = gs_rand_float(*self.command_cfg["lin_vel_y_range"], (len(envs_idx),), self.device)
-        self.commands[envs_idx, 2] = gs_rand_float(*self.command_cfg["ang_vel_range"], (len(envs_idx),), self.device)
-
     def step(self, actions): #actions come from neural net
         self.actions = torch.clip(actions, -self.env_cfg["clip_actions"], self.env_cfg["clip_actions"]) #clippimng to prevent extreme values
         exec_actions = self.last_actions if self.simulate_action_latency else self.actions  #simulate action latency
@@ -234,13 +228,6 @@ class Go2Env:
             device=self.device,
             dtype=gs.tc_float,
         )# net force applied on each links due to direct external contacts, shape (num_envs, num_links, 3)
-        # resample commands
-        envs_idx = (
-            (self.episode_length_buf % int(self.env_cfg["resampling_time_s"] / self.dt) == 0) #TODO: maybe adjust this (might not be needed to resample commands at all)
-            .nonzero(as_tuple=False)
-            .flatten()
-        ) # will contain the indices of all environments that have reached a multiple of 200 timesteps, and thus need resampling
-        self._resample_commands(envs_idx) # resample commands for those environments
 
         # check termination and reset
         self.reset_buf = self.episode_length_buf > self.max_episode_length# if we reached 1000 steps, we need to reset the environment
@@ -268,22 +255,44 @@ class Go2Env:
             self.episode_sums[name] += rew
 
         # compute observations
-        # TODO: add terrain height and base height to observations(?)
-        # we can get the base height with self.robot.get_pos()
-
-        # I think  the terrain height information is best given as privileged observation to the critic network  
         self.obs_buf = torch.cat(
             [
                 self.base_lin_vel * self.obs_scales["lin_vel"],  # 3, the robot's linear velocity in its base frame(3d)
                 self.base_ang_vel * self.obs_scales["ang_vel"],  # 3, the robot's angular velocity in its base frame(3d)
                 self.projected_gravity,  # 3, gravity vector in the robot's base frame, indicating its orientation
-                self.commands * self.commands_scale,  # 3, target velocities the robot should achieve
                 (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 12, current joint angles relative to default
                 self.dof_vel * self.obs_scales["dof_vel"],  # 12, current joint velocities 
-                self.actions,  # 12 # previous actions issued by the policy
+                self.actions,  # 12 # current actions issued by the policy
             ],
             axis=-1,
         )
+
+        # clip observations to prevent extreme values
+        # clip_obs = 100.0
+        # self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
+        
+        #TODO: try adding these informations: 
+        # foot contact states
+        # contact forces
+        # local terrain ahead of the robot
+        # terrain slope/gradient
+        
+        if self.num_privileged_obs:
+            self.privileged_obs_buf = torch.cat(
+                [
+                    self.base_lin_vel * self.obs_scales['lin_vel'],                     # 3
+                    self.base_ang_vel * self.obs_scales['ang_vel'],                     # 3
+                    self.projected_gravity,                                             # 3
+                    (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'], # 12, current joint angles relative to default
+                    self.dof_vel * self.obs_scales['dof_vel'],  # 12, current joint velocities
+                    self.last_dof_vel * self.obs_scales['dof_vel'],  # 12, previous joint velocities
+                    self.actions, # 12, current actions issued by the policy
+                    self.last_actions, # 12, previous actions
+                    self.base_pos, # 3, current base position
+                ],
+                axis=-1,
+            )
+            # self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
         # Render for recording if enabled
         self._render_headless()
@@ -291,13 +300,13 @@ class Go2Env:
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
 
-        return self.obs_buf, None, self.rew_buf, self.reset_buf, self.extras
+        return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras
 
     def get_observations(self):
         return self.obs_buf
 
     def get_privileged_observations(self):
-        return None
+        return self.privileged_obs_buf
 
     def reset_idx(self, envs_idx):
         if len(envs_idx) == 0:
@@ -334,8 +343,6 @@ class Go2Env:
                 torch.mean(self.episode_sums[key][envs_idx]).item() / self.env_cfg["episode_length_s"]
             )
             self.episode_sums[key][envs_idx] = 0.0
-
-        self._resample_commands(envs_idx)
 
     def reset(self):
         self.reset_buf[:] = True

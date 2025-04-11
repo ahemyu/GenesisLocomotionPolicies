@@ -109,7 +109,7 @@ def get_cfgs():
         "clip_actions": 100.0,
     }
     obs_cfg = {
-        "num_obs": 48,
+        "num_obs": 45,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -119,30 +119,24 @@ def get_cfgs():
     }
     reward_cfg = {
         # 'soft_dof_pos_limit': 0.9, # soft limit for joint position
-        "tracking_sigma": 0.4, # controls how quickly the reward falls off with increasing error
+        # "tracking_sigma": 0.4, # controls how quickly the reward falls off with increasing error
         "base_height_target": 0.35,
         "feet_height_target": 0.1,
         "reward_scales": {
-            "tracking_lin_vel": 3.0, # Reward for matching linear velocity
-            "tracking_ang_vel": 0.2, # Reward for matching angular velocity
+            # "tracking_lin_vel": 3.0, # Reward for matching linear velocity
+            # "tracking_ang_vel": 0.2, # Reward for matching angular velocity
             "lin_vel_z": -0.05,      # Penalty for vertical movement
             "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
-            "base_height": -10.0,    # Penalty for incorrect torso height
+            "base_height": -20.0,    # Penalty for incorrect torso height
             "action_rate": -0.005,   # penalty for rapid action changes
             "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
             'orientation': -2.0,      # Penalty for non flat base orientation
-            "absolute_lin_vel": 1.0 , # Reward for absolute linear velocity
+            "absolute_lin_vel": 2.0 , # Reward for absolute linear velocity
 
         },
     }
-    command_cfg = {
-        "num_commands": 3,
-        "lin_vel_x_range": [1.0, 4.0],
-        "lin_vel_y_range": [0, 0],
-        "ang_vel_range": [0, 0],
-    }
 
-    return env_cfg, obs_cfg, reward_cfg, command_cfg
+    return env_cfg, obs_cfg, reward_cfg
 
 
 def main():
@@ -157,7 +151,7 @@ def main():
     gs.init(logging_level="warning")
 
     log_dir = f"logs/{args.exp_name}"
-    env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
+    env_cfg, obs_cfg, reward_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, args.max_iterations)
 
     if os.path.exists(log_dir):
@@ -165,7 +159,7 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
 
     env = Go2Env(
-        num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg, command_cfg=command_cfg
+        num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg
     )
 
     runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
@@ -177,7 +171,7 @@ def main():
         runner.load(resume_path)
 
     pickle.dump(
-        [env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg],
+        [env_cfg, obs_cfg, reward_cfg, train_cfg],
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True) #setting init_at_random_ep_len to True will cause each 

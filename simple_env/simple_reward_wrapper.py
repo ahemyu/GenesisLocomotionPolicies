@@ -58,6 +58,7 @@ class RunOnFlatGround(Go2Env):
     def _reward_absolute_lin_vel(self):
         # Reward absolute linear velocity (encourages speed in any direction)
         # We take the norm of the horizontal velocity (x and y components)
+        #TODO: Could we also only reward velocity in the forward direction?
         absolute_velocity = torch.norm(self.base_lin_vel[:, :2], dim=1)
         return absolute_velocity
 
@@ -89,7 +90,6 @@ class WalkUneven(Go2Env):
     
             dim=1,
         )
-    #####TODO: include reward that encourages the robot to walk straight
+    #####TODO: include reward that encourages the robot to walk straight(so penalize movements in the y direction)
     ####TODO: foot slip penalty 
     #TODO: include reward related to current height of the robot and the height of the terrain in front of it, maybe smth with the feet, e.g. take bigger steps if terrain is high in front
-    #TODO: add feet heih
