@@ -3,8 +3,10 @@ import os
 import pickle
 import shutil
 
-from simple_go2_env import Go2Env
-from rsl_rl.runners import OnPolicyRunner
+import wandb
+
+from rsl_rl.runners.on_policy_runner import OnPolicyRunner
+from simple_reward_wrapper import RunOnFlatGround
 
 import genesis as gs
 
@@ -47,7 +49,7 @@ def get_train_cfg(exp_name, max_iterations):
             "resume_path": None,
             "run_name": "",
             "runner_class_name": "runner_class_name",
-            "save_interval": 500,
+            "save_interval": 200,
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1,
@@ -118,24 +120,19 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        # 'soft_dof_pos_limit': 0.9, # soft limit for joint position
-        # "tracking_sigma": 0.4, # controls how quickly the reward falls off with increasing error
         "base_height_target": 0.35,
         "feet_height_target": 0.1,
         "reward_scales": {
-            # "tracking_lin_vel": 3.0, # Reward for matching linear velocity
-            # "tracking_ang_vel": 0.2, # Reward for matching angular velocity
             "lin_vel_z": -0.05,      # Penalty for vertical movement
+            "lin_vel_y": -1.,      # Penalty for lateral movement
+            "lin_vel_x": 2., # Reward for absolute linear velocity
             "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
             "base_height": -20.0,    # Penalty for incorrect torso height
             "action_rate": -0.005,   # penalty for rapid action changes
             "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
             'orientation': -2.0,      # Penalty for non flat base orientation
-            "absolute_lin_vel": 2.0 , # Reward for absolute linear velocity
-
         },
     }
-
     return env_cfg, obs_cfg, reward_cfg
 
 
@@ -158,7 +155,7 @@ def main():
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
-    env = Go2Env(
+    env = RunOnFlatGround(
         num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg
     )
 
@@ -174,6 +171,7 @@ def main():
         [env_cfg, obs_cfg, reward_cfg, train_cfg],
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
+    wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True) #setting init_at_random_ep_len to True will cause each 
 
 
@@ -181,5 +179,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v8 -B 8192 --max_iterations 1000 
+python train_run.py -e go2-running_without_target_v2 -B 8192 --max_iterations 1000 
 """
