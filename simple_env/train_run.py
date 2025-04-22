@@ -106,7 +106,7 @@ def get_cfgs():
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 30.0,
         "resampling_time_s": 4.0,
-        "action_scale": 0.30, # controls maximum angular deviation from the default joint positions
+        "action_scale": 0.15, # controls maximum angular deviation from the default joint positions
         "simulate_action_latency": True,
         "clip_actions": 100.0,
     }
@@ -124,13 +124,15 @@ def get_cfgs():
         "feet_height_target": 0.1,
         "reward_scales": {
             "lin_vel_z": -0.05,      # Penalty for vertical movement
-            "lin_vel_y": -1.,      # Penalty for lateral movement
-            "lin_vel_x": 2., # Reward for absolute linear velocity
-            "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
+            "lin_vel_y": -2.,      # Penalty for lateral movement
+            "lin_vel_x": 3., # Reward for absolute linear velocity
+            "ang_vel_xy": -0.2,     # Penalty for angular velocity in x and y
             "base_height": -20.0,    # Penalty for incorrect torso height
-            "action_rate": -0.005,   # penalty for rapid action changes
+            "action_rate": -0.02,   # penalty for rapid action changes
             "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
             'orientation': -2.0,      # Penalty for non flat base orientation
+            "foot_clearance": 0.5,     # Reward for foot clearance
+            "foot_phase_symmetry": 1.0, # Reward for foot phase symmetry
         },
     }
     return env_cfg, obs_cfg, reward_cfg
@@ -142,7 +144,7 @@ def main():
     parser.add_argument("-B", "--num_envs", type=int, default=1)
     parser.add_argument("--max_iterations", type=int, default=1)
     parser.add_argument('--resume', type=str, default=None)
-    # parser.add_argument('--ckpt', type=int, default=1000)
+    parser.add_argument('--ckpt', type=int, default=1000)
     args = parser.parse_args()
 
     gs.init(logging_level="warning")
@@ -174,10 +176,13 @@ def main():
     wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True) #setting init_at_random_ep_len to True will cause each 
 
-
+    runner.
 if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_without_target_v2 -B 8192 --max_iterations 1000 
+python train_run.py -e go2-running_without_target_v2 -B 8192 --max_iterations 1000 --resume go2-running_without_target_v2 --ckpt 1000
+
+resume: 
+python train_run.py -B 8192 --max_iterations 1000 --resume go2-running_without_target_v2 --ckpt 1000
 """

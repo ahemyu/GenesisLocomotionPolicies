@@ -2,7 +2,7 @@ from simple_go2_env import Go2Env
 import torch 
 
 class RunOnFlatGround(Go2Env):
-    
+
     def _reward_lin_vel_x(self):
         # reward lin_velocity in the forward direction
         forward_velocity = self.base_lin_vel[:, 0]
@@ -48,6 +48,44 @@ class RunOnFlatGround(Go2Env):
     
             dim=1,
         )
+    
+    def _reward_foot_clearance(self):
+        """
+        Give positive reward when a swing‑foot rises above the clearance
+        target during the swing phase.
+        """
+        # Contact mask: 1 = foot in contact, 0 = swing
+        contact_mask = (
+            torch.norm(self.link_contact_forces[:, self.feet_link_indices, :], dim=-1) > 0.10
+        ).float()                                    # shape (E, 4)
+
+        swing_mask = 1.0 - contact_mask             # 1 when in swing
+
+        foot_height = self.foot_positions[:, :, 2]   # world‑frame z in metres
+        target = self.reward_cfg.get("feet_height_target", 0.06)
+        # Positive clearance only when higher than target
+        clearance = torch.clamp(foot_height - target, min=0.0)
+
+        # Mean over the four feet, scaled by swing_mask
+        return torch.mean(clearance * swing_mask, dim=1)
+    
+    def _reward_foot_phase_symmetry(self):
+        """
+        Encourage diagonal pairs (FL–RR, FR–RL) to share contact phase,
+        which produces a clean trot duty cycle.
+        """
+        contact = (
+            torch.norm(self.link_contact_forces[:, self.feet_link_indices, :], dim=-1) > 0.10
+        ).float()
+
+        # Indices match links_to_keep order ➜ [FL, FR, RL, RR]
+        FL, FR, RL, RR = contact[:, 0], contact[:, 1], contact[:, 2], contact[:, 3]
+
+        # 1 when phases match, 0 when opposite
+        diag_sym_1 = 1.0 - torch.abs(FL - RR)
+        diag_sym_2 = 1.0 - torch.abs(FR - RL)
+
+        return 0.5 * (diag_sym_1 + diag_sym_2)
 
 class WalkUneven(Go2Env):
     def _reward_lin_vel_z(self):
