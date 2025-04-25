@@ -41,9 +41,9 @@ def get_train_cfg(exp_name, max_iterations):
             "load_run": -1,
             "log_interval": 1,
             "max_iterations": max_iterations,
-            "num_steps_per_env": 96, #lenght of trajectories
+            "num_steps_per_env": 128, #length of trajectories
             "policy_class_name": "ActorCritic",
-            "record_interval": -1,
+            "record_interval": 100,
             "resume": False,
             "resume_path": None,
             "run_name": "",
@@ -186,5 +186,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_uneven.py -e go2-uneven -B 4096 --max_iterations 1000
+python train_uneven.py -e go2-uneven -B 1 --max_iterations 10
 """

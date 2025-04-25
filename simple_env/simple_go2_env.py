@@ -56,7 +56,7 @@ class Go2Env:
 
         self.simulate_action_latency: bool = True  # there is a 1 step latency on real robot
         self.dt: float = 0.02  # control frequency on real robot is 50hz
-        self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 30/0.02 = 1500 steps
+        self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 30/0.02 = 1500 steps; maximum number of environment steps allowed in one episode before a forced reset
 
         self.env_cfg: dict = env_cfg
         self.use_terrain = self.env_cfg.get('use_terrain', False)
@@ -496,7 +496,8 @@ class Go2Env:
 
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
-        if len(self._recorded_frames) == 600:
+        print("We have recorded", len(self._recorded_frames), "frames")
+        if len(self._recorded_frames) >= 600:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False
