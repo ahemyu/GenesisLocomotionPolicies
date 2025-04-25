@@ -128,9 +128,11 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        "tracking_sigma": 0.40,# controls how quickly the reward falls off with increasing error
+        "tracking_sigma": 0.40,         # controls how quickly the reward falls off with increasing error
+        "lin_vel_target": 1.0,          # target linear velocity
         "reward_scales": {
-            "lin_vel_x": 1.0,            # Reward for x axis base linear velocity
+            # "lin_vel_x": 1.0,            # Reward for x axis base linear velocity
+            "tracking_lin_vel_x": 2.0,    # Reward for tracking x axis base linear velocity
             "lin_vel_y": -0.5,           # Penalty for y axis base linear velocity
             "lin_vel_z": -0.1,           # Penalty for z axis base linear velocity
             "action_rate": -0.005,           # Small penalty for rapid action changes
@@ -186,5 +188,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_uneven.py -e go2-uneven -B 1 --max_iterations 10
+python train_uneven.py -e go2-uneven -B 4096 --max_iterations 1000
 """

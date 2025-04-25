@@ -485,7 +485,7 @@ class Go2Env:
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 800:
+        if self._recording and len(self._recorded_frames) < 1025:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
                 pos=robot_pos + np.array([-1.5, 0.0, 1.2]),  # Position camera behind and above robot
@@ -497,7 +497,7 @@ class Go2Env:
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
         print("We have recorded", len(self._recorded_frames), "frames")
-        if len(self._recorded_frames) >= 600:
+        if len(self._recorded_frames) == 1024:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False
