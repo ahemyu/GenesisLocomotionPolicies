@@ -6,7 +6,7 @@ class RunOnFlatGround(Go2Env):
     def _reward_lin_vel_x(self):
         # reward lin_velocity in the forward direction
         forward_velocity = self.base_lin_vel[:, 0]
-        return torch.clamp(forward_velocity, min=0.0)
+        return forward_velocity
     
     def _reward_lin_vel_y(self):
         # Penalize y axis base linear velocity
@@ -88,9 +88,23 @@ class RunOnFlatGround(Go2Env):
         return 0.5 * (diag_sym_1 + diag_sym_2)
 
 class WalkUneven(Go2Env):
+
+    def _reward_lin_vel_x(self):
+        # reward lin_velocity in the forward direction
+        forward_velocity = self.base_lin_vel[:, 0]
+        return forward_velocity
+
+    def _reward_lin_vel_y(self):
+        # Penalize y axis base linear velocity
+        return torch.square(self.base_lin_vel[:, 1])
+
     def _reward_lin_vel_z(self):
         # Penalize z axis base linear velocity
         return torch.square(self.base_lin_vel[:, 2])
+
+    def _reward_ang_vel_xy(self):
+        # Penalize xy axes base angular velocity
+        return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
 
     def _reward_orientation(self): # 
         # Penalize non flat base orientation
@@ -114,6 +128,3 @@ class WalkUneven(Go2Env):
     
             dim=1,
         )
-    #####TODO: include reward that encourages the robot to walk straight(so penalize movements in the y direction)
-    ####TODO: foot slip penalty 
-    #TODO: include reward related to current height of the robot and the height of the terrain in front of it, maybe smth with the feet, e.g. take bigger steps if terrain is high in front

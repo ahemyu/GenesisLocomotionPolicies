@@ -1,7 +1,10 @@
 import argparse
+import json
 import os
 import pickle
 import shutil
+
+import wandb
 from simple_reward_wrapper import WalkUneven
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
@@ -11,18 +14,18 @@ def get_train_cfg(exp_name, max_iterations):
 
     train_cfg_dict = {
         "algorithm": {
-            "clip_param": 0.2,
-            "desired_kl": 0.01,
-            "entropy_coef": 0.01,
-            "gamma": 0.99,
-            "lam": 0.95,
-            "learning_rate": 0.001,
-            "max_grad_norm": 1.0,
-            "num_learning_epochs": 5,
-            "num_mini_batches": 4,
+            "clip_param": 0.2, # control how much the policy is allowed to change at each update step (increase => faster learning but riskier, decrease => slower but more stable)
+            "desired_kl": 0.01, # how much change do I want between the old and new policy (using an adaptive schedule in this implementation)
+            "entropy_coef": 0.01, # rewards randomness in action selection (might make sense to set it higher in early training and lower it later)
+            "gamma": 0.99, # determines how much agent values future rewards 
+            "lam": 0.95, # lambda parameter for GAE (Generalized Advantage Estimation); higher means advantages depend more on long-term returns, lower means more on short-term returns
+            "learning_rate": 0.001, # is adaptive 
+            "max_grad_norm": 1.0, # gradient clipping (to prevent exploding gradients)
+            "num_learning_epochs": 5, # how often do we reuse one rollout batch 
+            "num_mini_batches": 4, # how many chunks the data is split into during training ((num_envs * num_steps_per_env) / num_mini_batches) 
             "schedule": "adaptive",
             "use_clipped_value_loss": True,
-            "value_loss_coef": 1.0,
+            "value_loss_coef": 1.0, # weight of value loss in the total loss function; so 1.0 means value loss is equally important as policy loss
         },
         "init_member_classes": {},
         "policy": {
@@ -38,14 +41,14 @@ def get_train_cfg(exp_name, max_iterations):
             "load_run": -1,
             "log_interval": 1,
             "max_iterations": max_iterations,
-            "num_steps_per_env": 96,
+            "num_steps_per_env": 96, #lenght of trajectories
             "policy_class_name": "ActorCritic",
             "record_interval": -1,
             "resume": False,
             "resume_path": None,
             "run_name": "",
             "runner_class_name": "runner_class_name",
-            "save_interval": 100,
+            "save_interval": 200,
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1,
@@ -88,8 +91,8 @@ def get_cfgs():
             "RL_calf_joint",
         ],
         # PD
-        "kp": 20.0,
-        "kd": 0.5,
+        "kp": 20.0, # we could try lowering to 15 or 10
+        "kd": 0.5, # if joint movements feel springy/jittery we could try increasing to 1.0
         # termination
         "termination_if_roll_greater_than": 20,  # degree
         "termination_if_pitch_greater_than": 10,
@@ -99,7 +102,7 @@ def get_cfgs():
         "resampling_time_s": 4.0,
         "action_scale": 0.30,
         "simulate_action_latency": True,
-        "clip_actions": 100.0,
+        "clip_actions": 100.0, # self.actions = torch.clip(actions, -clip_actions, clip_actions), so it prevents the actions from going outside the range of -100 to 100 (which is too high)
         'use_terrain': True,
         'terrain_cfg': {
             'subterrain_types': "pyramid_stairs_terrain",
@@ -127,6 +130,8 @@ def get_cfgs():
     reward_cfg = {
         "tracking_sigma": 0.40,# controls how quickly the reward falls off with increasing error
         "reward_scales": {
+            "lin_vel_x": 1.0,            # Reward for x axis base linear velocity
+            "lin_vel_y": -0.5,           # Penalty for y axis base linear velocity
             "lin_vel_z": -0.1,           # Penalty for z axis base linear velocity
             "action_rate": -0.005,           # Small penalty for rapid action changes
             "orientation": -0.01,          # Penalty for orientation not parallel to terrain
@@ -164,6 +169,16 @@ def main():
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
 
+    all_cfgs = {
+        "env_cfg": env_cfg,
+        "obs_cfg": obs_cfg,
+        "reward_cfg": reward_cfg,
+        "train_cfg": train_cfg,
+    }
+    with open(os.path.join(log_dir, "config.json"), "w") as f:
+        json.dump(all_cfgs, f, indent=4)
+
+    wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
 
 
@@ -171,5 +186,5 @@ if __name__ == "__main__":
     main()
 
 """
-python train_uneven.py -e go2-uneven -B 1 --max_iterations 1
+python train_uneven.py -e go2-uneven -B 4096 --max_iterations 1000
 """

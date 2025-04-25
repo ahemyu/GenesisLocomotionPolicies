@@ -176,7 +176,6 @@ def main():
     wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True) #setting init_at_random_ep_len to True will cause each 
 
-    runner.
 if __name__ == "__main__":
     main()
 
