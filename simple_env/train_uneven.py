@@ -134,7 +134,7 @@ def get_cfgs():
             # "lin_vel_x": 1.0,            # Reward for x axis base linear velocity
             "tracking_lin_vel_x": 1.0,    # Reward for tracking x axis base linear velocity
             "forward_progress_x": 2.0,        # Reward for forward progress
-            "lin_vel_y": -5.,           # Penalty for y axis base linear velocity
+            "lin_vel_y": -5.0,           # Penalty for y axis base linear velocity
             "lin_vel_z": -0.1,           # Penalty for z axis base linear velocity
             "action_rate": -0.005,           # Small penalty for rapid action changes
             "orientation": -0.01,          # Penalty for orientation not parallel to terrain
@@ -161,6 +161,15 @@ def main():
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
+    all_cfgs = {
+        "env_cfg": env_cfg,
+        "obs_cfg": obs_cfg,
+        "reward_cfg": reward_cfg,
+        "train_cfg": train_cfg,
+    }
+    with open(os.path.join(log_dir, "config.json"), "w") as f:
+        json.dump(all_cfgs, f, indent=4)
+
     env = WalkUneven(
         num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg
     )
@@ -171,16 +180,6 @@ def main():
         [env_cfg, obs_cfg, reward_cfg, train_cfg],
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
-
-    all_cfgs = {
-        "env_cfg": env_cfg,
-        "obs_cfg": obs_cfg,
-        "reward_cfg": reward_cfg,
-        "train_cfg": train_cfg,
-    }
-    with open(os.path.join(log_dir, "config.json"), "w") as f:
-        json.dump(all_cfgs, f, indent=4)
-
     wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
 

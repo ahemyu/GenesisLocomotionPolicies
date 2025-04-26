@@ -162,7 +162,7 @@ class Go2Env:
         """Set up reward functions and scale rewards by dt"""
         self.reward_functions, self.episode_sums = dict(), dict()
         for name in self.reward_scales.keys():
-            self.reward_scales[name] *= self.dt
+            self.reward_scales[name] *= self.dt # we scale the rewards by dt bc 1 step != 1 second in the simulation
             self.reward_functions[name] = getattr(self, "_reward_" + name)
             self.episode_sums[name] = torch.zeros((self.num_envs,), device=self.device, dtype=gs.tc_float)
 
