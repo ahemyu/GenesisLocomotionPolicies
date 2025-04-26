@@ -123,7 +123,7 @@ class Go2Env:
             [terrain_margin_x, terrain_margin_y], device=self.device, dtype=gs.tc_float
         )
         
-        height_field = self.terrain.geoms[0].metadata["height_field"] # (144, 144) why???
+        height_field = self.terrain.geoms[0].metadata["height_field"] # (144, 144)
         self.height_field = torch.tensor(
             height_field, device=self.device, dtype=gs.tc_float
         ) * self.terrain_cfg['vertical_scale']
@@ -487,10 +487,10 @@ class Go2Env:
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 897:
+        if self._recording and len(self._recorded_frames) < 1025:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
-                pos=robot_pos + np.array([-1.5, 0.0, 1.2]),  # Position camera behind and above robot
+                pos=robot_pos + np.array([-1.5, 0.0, 2.2]),  # Position camera behind and above robot
                 lookat=robot_pos + np.array([0.3, 0, 0.1])   # Look slightly ahead of the robot
             )
             frame, _, _, _ = self._floating_camera.render()
@@ -499,7 +499,7 @@ class Go2Env:
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
         print("We have recorded", len(self._recorded_frames), "frames")
-        if len(self._recorded_frames) == 896:
+        if len(self._recorded_frames) == 1024:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False

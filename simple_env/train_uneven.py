@@ -106,9 +106,9 @@ def get_cfgs():
         'use_terrain': True,
         'terrain_cfg': {
             'subterrain_types': "pyramid_stairs_terrain",
-            'n_subterrains': (3, 3),
+            'n_subterrains': (3, 1),
             'subterrain_size': (12.0, 12.0),
-            'horizontal_scale': 0.25,
+            'horizontal_scale': 0.25, # determines the number of scales per tile, so here 12/0.25 = 48 per tile so 144 in total (3 tiles)
             'vertical_scale': 0.005,
         },
         'termination_contact_link_names': ['base'],
@@ -129,11 +129,11 @@ def get_cfgs():
     }
     reward_cfg = {
         "tracking_sigma": 0.40,         # controls how quickly the reward falls off with increasing error
-        "lin_vel_target": 1.0,          # target linear velocity
+        "lin_vel_target": 1.5,          # target linear velocity
         "reward_scales": {
             # "lin_vel_x": 1.0,            # Reward for x axis base linear velocity
             "tracking_lin_vel_x": 1.0,    # Reward for tracking x axis base linear velocity
-            "forward_progress": 1.0,        # Reward for forward progress
+            "forward_progress_x": 2.0,        # Reward for forward progress
             "lin_vel_y": -5.,           # Penalty for y axis base linear velocity
             "lin_vel_z": -0.1,           # Penalty for z axis base linear velocity
             "action_rate": -0.005,           # Small penalty for rapid action changes

@@ -46,7 +46,7 @@ def main():
             obs, _, rews, dones, infos = env.step(actions)
             n_frames += 1
             if args.record:
-                if n_frames == 800:
+                if n_frames == 1024:
                     env.stop_recording(f"{args.exp_name}.mp4")
                     exit()
 
@@ -55,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_uneven.py -e go2-uneven -r --ckpt 200
+python eval_uneven.py -e go2-uneven-v1 -r --ckpt 1
 """

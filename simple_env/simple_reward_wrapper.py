@@ -102,10 +102,12 @@ class WalkUneven(Go2Env):
 
         return torch.exp(-squared_error / self.reward_cfg["tracking_sigma"]) #between [0,1]
 
-    def _reward_forward_progress(self):
-        # reward forward progress in x direction        
-        return self.base_pos[:,0] - self.last_base_pos[:,0]
-         
+    def _reward_forward_progress_x(self):
+        # reward forward progress in x direction from the starting point
+        starting_point_x = self.base_init_pos[0].item() # get the x position of the starting point  
+        return self.base_pos[:,0] - starting_point_x # calculate progress from starting point
+    
+    # TODO: If it ain't working try adding a penalty for deviation from y starting point
     def _reward_lin_vel_y(self):
         # Penalize y axis base linear velocity
         return torch.square(self.base_lin_vel[:, 1])
