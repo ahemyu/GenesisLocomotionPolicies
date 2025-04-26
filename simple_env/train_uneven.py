@@ -119,7 +119,7 @@ def get_cfgs():
 
     obs_cfg = {
         "num_obs": 45,
-        "num_priviliged_obs": 72,
+        "num_priviliged_obs": 75,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -132,8 +132,9 @@ def get_cfgs():
         "lin_vel_target": 1.0,          # target linear velocity
         "reward_scales": {
             # "lin_vel_x": 1.0,            # Reward for x axis base linear velocity
-            "tracking_lin_vel_x": 2.0,    # Reward for tracking x axis base linear velocity
-            "lin_vel_y": -0.5,           # Penalty for y axis base linear velocity
+            "tracking_lin_vel_x": 1.0,    # Reward for tracking x axis base linear velocity
+            "forward_progress": 1.0,        # Reward for forward progress
+            "lin_vel_y": -5.,           # Penalty for y axis base linear velocity
             "lin_vel_z": -0.1,           # Penalty for z axis base linear velocity
             "action_rate": -0.005,           # Small penalty for rapid action changes
             "orientation": -0.01,          # Penalty for orientation not parallel to terrain
@@ -188,5 +189,6 @@ if __name__ == "__main__":
     main()
 
 """
-python train_uneven.py -e go2-uneven -B 4096 --max_iterations 1000
+To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
+python train_uneven.py -e go2-uneven-v1 -B 8192 --max_iterations 1000
 """

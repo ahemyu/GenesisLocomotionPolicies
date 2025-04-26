@@ -202,8 +202,8 @@ class Go2Env:
         
         # Initialize pose buffers
         self.base_pos = torch.zeros((self.num_envs, 3), device=self.device, dtype=gs.tc_float)
+        self.last_base_pos = torch.zeros_like(self.base_pos)
         self.base_quat = torch.zeros((self.num_envs, 4), device=self.device, dtype=gs.tc_float)
-        
         # Default joint positions
         self.default_dof_pos = torch.tensor(
             [self.env_cfg["default_joint_angles"][name] for name in self.env_cfg["dof_names"]],
@@ -299,6 +299,7 @@ class Go2Env:
         """Update all robot state variables after simulation step"""
         # update buffers
         self.episode_length_buf += 1 # increment episode length
+        self.last_base_pos[:] = self.base_pos[:] # store previous base position
         self.base_pos[:] = self.robot.get_pos() # get fresh robot base position
         self.base_quat[:] = self.robot.get_quat() # get fresh robot base orientation
         self.base_euler = quat_to_xyz( 
@@ -405,6 +406,7 @@ class Go2Env:
                 self.actions, # 12, current actions issued by the policy
                 self.last_actions, # 12, previous actions
                 self.base_pos, # 3, current base position
+                self.last_base_pos, # 3, previous base position
             ],
             axis=-1,
         )
@@ -440,7 +442,7 @@ class Go2Env:
         )
 
         # reset base
-        self.base_pos[envs_idx] = self.base_init_pos 
+        self.base_pos[envs_idx] = self.last_base_pos[envs_idx] = self.base_init_pos 
         self.base_quat[envs_idx] = self.base_init_quat.reshape(1, -1)
         self.robot.set_pos(self.base_pos[envs_idx], zero_velocity=False, envs_idx=envs_idx)
         self.robot.set_quat(self.base_quat[envs_idx], zero_velocity=False, envs_idx=envs_idx)
@@ -485,7 +487,7 @@ class Go2Env:
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 1025:
+        if self._recording and len(self._recorded_frames) < 897:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
                 pos=robot_pos + np.array([-1.5, 0.0, 1.2]),  # Position camera behind and above robot
@@ -497,7 +499,7 @@ class Go2Env:
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
         print("We have recorded", len(self._recorded_frames), "frames")
-        if len(self._recorded_frames) == 1024:
+        if len(self._recorded_frames) == 896:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False

@@ -95,14 +95,17 @@ class WalkUneven(Go2Env):
     #     return forward_velocity
 
     def _reward_tracking_lin_vel_x(self):
-        # Penalize deviation from target linear velocity
+        # reward tracking lin_velocity in the forward direction
         lin_vel_target = self.reward_cfg["lin_vel_target"]
         lin_vel_x = self.base_lin_vel[:, 0]
         squared_error = torch.square(lin_vel_x - lin_vel_target)
 
         return torch.exp(-squared_error / self.reward_cfg["tracking_sigma"]) #between [0,1]
-    
 
+    def _reward_forward_progress(self):
+        # reward forward progress in x direction        
+        return self.base_pos[:,0] - self.last_base_pos[:,0]
+         
     def _reward_lin_vel_y(self):
         # Penalize y axis base linear velocity
         return torch.square(self.base_lin_vel[:, 1])
