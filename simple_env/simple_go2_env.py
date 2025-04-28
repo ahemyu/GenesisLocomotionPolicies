@@ -55,7 +55,7 @@ class Go2Env:
         self.num_actions: int = env_cfg["num_actions"] #12
 
         self.simulate_action_latency: bool = True  # there is a 1 step latency on real robot
-        self.dt: float = 0.02  # control frequency on real robot is 50hz
+        self.dt: float = 0.02  # control frequency on real robot is 50hz (0.02 = 1/50)
         self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 30/0.02 = 1500 steps; maximum number of environment steps allowed in one episode before a forced reset
 
         self.env_cfg: dict = env_cfg
@@ -123,7 +123,7 @@ class Go2Env:
             [terrain_margin_x, terrain_margin_y], device=self.device, dtype=gs.tc_float
         )
         
-        height_field = self.terrain.geoms[0].metadata["height_field"] # (144, 144)
+        height_field = self.terrain.geoms[0].metadata["height_field"]
         self.height_field = torch.tensor(
             height_field, device=self.device, dtype=gs.tc_float
         ) * self.terrain_cfg['vertical_scale']
@@ -228,7 +228,6 @@ class Go2Env:
 
     def _initialize_terrain_heights(self):
         """Initialize terrain heights for terrain-based environments"""
-        #TODO: is this correct? What is this doing?
         clipped_base_pos = self.base_pos[:, :2].clamp(min=torch.zeros(2, device=self.device), max=self.terrain_margin)
         height_field_ids = (clipped_base_pos / self.terrain_cfg['horizontal_scale'] - 0.5).floor().int()
         height_field_ids.clamp(min=0)

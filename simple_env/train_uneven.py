@@ -22,7 +22,7 @@ def get_train_cfg(exp_name, max_iterations):
             "learning_rate": 0.001, # is adaptive 
             "max_grad_norm": 1.0, # gradient clipping (to prevent exploding gradients)
             "num_learning_epochs": 5, # how often do we reuse one rollout batch 
-            "num_mini_batches": 4, # how many chunks the data is split into during training ((num_envs * num_steps_per_env) / num_mini_batches) 
+            "num_mini_batches":4, # how many chunks the data is split into during training ((num_envs * num_steps_per_env) / num_mini_batches) 
             "schedule": "adaptive",
             "use_clipped_value_loss": True,
             "value_loss_coef": 1.0, # weight of value loss in the total loss function; so 1.0 means value loss is equally important as policy loss
@@ -41,7 +41,7 @@ def get_train_cfg(exp_name, max_iterations):
             "load_run": -1,
             "log_interval": 1,
             "max_iterations": max_iterations,
-            "num_steps_per_env": 128, #length of trajectories
+            "num_steps_per_env": 32, # how many steps to take in each environment before updating the policy
             "policy_class_name": "ActorCritic",
             "record_interval": 100,
             "resume": False,
@@ -129,17 +129,16 @@ def get_cfgs():
     }
     reward_cfg = {
         "tracking_sigma": 0.40,         # controls how quickly the reward falls off with increasing error
-        "lin_vel_target": 1.5,          # target linear velocity
+        "lin_vel_target": 1.0,          # target linear velocity
         "reward_scales": {
-            # "lin_vel_x": 1.0,            # Reward for x axis base linear velocity
             "tracking_lin_vel_x": 1.0,    # Reward for tracking x axis base linear velocity
             "forward_progress_x": 2.0,        # Reward for forward progress
-            "sideways_movement": -1.0,        # Penalty for sideways movement
+            # "sideways_movement": -1.0,        # Penalty for sideways movement
             "lin_vel_y": -5.0,              # Penalty for y axis base linear velocity
             "lin_vel_z": -0.1,              # Penalty for z axis base linear velocity
             "action_rate": -0.005,          # Small penalty for rapid action changes
-            "orientation": -0.05,          # Penalty for orientation not parallel to terrain
-            "collision": -5.0,            # Penalty for collision
+            "orientation": -0.01,          # Penalty for orientation not parallel to terrain
+            "collision": -1.0,            # Penalty for collision
         },
     }
     return env_cfg, obs_cfg, reward_cfg
@@ -169,6 +168,7 @@ def main():
         "obs_cfg": obs_cfg,
         "reward_cfg": reward_cfg,
         "train_cfg": train_cfg,
+        "num_envs": args.num_envs,
     }
     with open(os.path.join(log_dir, "config.json"), "w") as f:
         json.dump(all_cfgs, f, indent=4)
@@ -198,8 +198,8 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_uneven.py -e go2-uneven-v3 -B 8192 --max_iterations 1000
+python train_uneven.py -e go2-uneven-v5 -B 4096 --max_iterations 1000
 
 resume : 
-python train_uneven.py -e go2-uneven-v1-finetune-1 -B 8192 --max_iterations 1000 --resume go2-uneven-v1 --ckpt 1000
+python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000
 """

@@ -150,5 +150,6 @@
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1
-    }
+    },
+    "num_envs": 8192
 }
