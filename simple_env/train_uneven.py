@@ -100,7 +100,7 @@ def get_cfgs():
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 30.0,
         "resampling_time_s": 4.0,
-        "action_scale": 0.30,
+        "action_scale": 0.30, # this is smth like the amplitude knob that converts the policy's dimesionless output into real angles
         "simulate_action_latency": True,
         "clip_actions": 100.0, # self.actions = torch.clip(actions, -clip_actions, clip_actions), so it prevents the actions from going outside the range of -100 to 100 (which is too high)
         'use_terrain': True,
@@ -134,11 +134,12 @@ def get_cfgs():
             # "lin_vel_x": 1.0,            # Reward for x axis base linear velocity
             "tracking_lin_vel_x": 1.0,    # Reward for tracking x axis base linear velocity
             "forward_progress_x": 2.0,        # Reward for forward progress
-            "lin_vel_y": -5.0,           # Penalty for y axis base linear velocity
-            "lin_vel_z": -0.1,           # Penalty for z axis base linear velocity
-            "action_rate": -0.005,           # Small penalty for rapid action changes
-            "orientation": -0.01,          # Penalty for orientation not parallel to terrain
-            "collision": -1.0,            # Penalty for collision
+            "sideways_movement": -1.0,        # Penalty for sideways movement
+            "lin_vel_y": -5.0,              # Penalty for y axis base linear velocity
+            "lin_vel_z": -0.1,              # Penalty for z axis base linear velocity
+            "action_rate": -0.005,          # Small penalty for rapid action changes
+            "orientation": -0.05,          # Penalty for orientation not parallel to terrain
+            "collision": -5.0,            # Penalty for collision
         },
     }
     return env_cfg, obs_cfg, reward_cfg
@@ -149,6 +150,8 @@ def main():
     parser.add_argument("-e", "--exp_name", type=str, default="go2-uneven")
     parser.add_argument("-B", "--num_envs", type=int, default=1)
     parser.add_argument("--max_iterations", type=int, default=1)
+    parser.add_argument("--resume", type=str, default=None)
+    parser.add_argument('--ckpt', type=int, default=1000)
     args = parser.parse_args()
 
     gs.init(logging_level="warning")
@@ -175,6 +178,12 @@ def main():
     )
 
     runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
+    
+    if args.resume is not None:
+        resume_dir = f'logs/{args.resume}'
+        resume_path = os.path.join(resume_dir, f'model_{args.ckpt}.pt')
+        print('==> resume training from', resume_path)
+        runner.load(resume_path)
 
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, train_cfg],
@@ -189,5 +198,8 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_uneven.py -e go2-uneven-v1 -B 8192 --max_iterations 1000
+python train_uneven.py -e go2-uneven-v3 -B 8192 --max_iterations 1000
+
+resume : 
+python train_uneven.py -e go2-uneven-v1-finetune-1 -B 8192 --max_iterations 1000 --resume go2-uneven-v1 --ckpt 1000
 """

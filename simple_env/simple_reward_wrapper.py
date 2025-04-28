@@ -90,7 +90,7 @@ class RunOnFlatGround(Go2Env):
 class WalkUneven(Go2Env):
 
     # def _reward_lin_vel_x(self):
-    #     # reward lin_velocity in the forward direction
+    #     # reward lin_velocity in the forward direction,0
     #     forward_velocity = self.base_lin_vel[:, 0]
     #     return forward_velocity
 
@@ -107,7 +107,12 @@ class WalkUneven(Go2Env):
         starting_point_x = self.base_init_pos[0].item() # get the x position of the starting point  
         return self.base_pos[:,0] - starting_point_x # calculate progress from starting point
     
-    # TODO: If it ain't working try adding a penalty for deviation from y starting point
+    #TODO: This didn't work, try adding a little bit of leeway around the starting point
+    def _reward_sideways_movement(self):
+        starting_point_y = self.base_init_pos[1].item() # get the y position of the starting point
+        leeway = 1.0 # leeway around the starting point
+        return torch.abs(self.base_pos[:, 1] - starting_point_y) - leeway # highest reward would be exactly the leeway
+    
     def _reward_lin_vel_y(self):
         # Penalize y axis base linear velocity
         return torch.square(self.base_lin_vel[:, 1])

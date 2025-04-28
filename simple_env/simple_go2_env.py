@@ -127,7 +127,7 @@ class Go2Env:
         self.height_field = torch.tensor(
             height_field, device=self.device, dtype=gs.tc_float
         ) * self.terrain_cfg['vertical_scale']
-        self.base_init_pos = torch.tensor([6.0, 6.0, -0.3], device=self.device) # start in the middle of first terrain
+        self.base_init_pos = torch.tensor([6.0, 6.0, -0.3], device=self.device) # start in the middle of first terrain #TODO: instead of hardcoding, we can sample a random position in the middle of the first terrain
 
     def _add_simple_plane(self):
         """Add simple plane to the scene"""
@@ -228,6 +228,7 @@ class Go2Env:
 
     def _initialize_terrain_heights(self):
         """Initialize terrain heights for terrain-based environments"""
+        #TODO: is this correct? What is this doing?
         clipped_base_pos = self.base_pos[:, :2].clamp(min=torch.zeros(2, device=self.device), max=self.terrain_margin)
         height_field_ids = (clipped_base_pos / self.terrain_cfg['horizontal_scale'] - 0.5).floor().int()
         height_field_ids.clamp(min=0)
@@ -487,7 +488,7 @@ class Go2Env:
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 1025:
+        if self._recording and len(self._recorded_frames) < 1153:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
                 pos=robot_pos + np.array([-1.5, 0.0, 2.2]),  # Position camera behind and above robot
@@ -499,7 +500,7 @@ class Go2Env:
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
         print("We have recorded", len(self._recorded_frames), "frames")
-        if len(self._recorded_frames) == 1024:
+        if len(self._recorded_frames) == 1152:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False
