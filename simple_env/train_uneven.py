@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_uneven.py -e go2-uneven-v5 -B 4096 --max_iterations 1000
+python train_uneven.py -e go2-uneven-v5-double-envs -B 8192 --max_iterations 1000
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000
