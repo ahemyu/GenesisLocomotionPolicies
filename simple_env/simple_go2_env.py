@@ -127,7 +127,7 @@ class Go2Env:
         self.height_field = torch.tensor(
             height_field, device=self.device, dtype=gs.tc_float
         ) * self.terrain_cfg['vertical_scale']
-        self.base_init_pos = torch.tensor([6.0, 6.0, -0.3], device=self.device) # start in the middle of first terrain #TODO: instead of hardcoding, we can sample a random position in the middle of the first terrain
+        self.base_init_pos = torch.tensor([6.0, 6.0, -0.4], device=self.device) # start in the middle of first terrain #TODO: instead of hardcoding, we can sample a random position in the middle of the first terrain
 
     def _add_simple_plane(self):
         """Add simple plane to the scene"""
@@ -521,3 +521,27 @@ class Go2Env:
         if save_path is not None:
             print("fps", int(1 / self.dt))
             self._floating_camera.stop_recording(save_path, fps=int(1 / self.dt))
+    
+    ### Helper functions ###
+    def _ground_height_at(self, xy: torch.Tensor) -> torch.Tensor:
+        """
+        Return terrain height at world (x, y).
+
+        Parameters
+        ----------
+        xy : torch.Tensor            # shape (..., 2)
+            World coordinates in metres.
+
+        Returns
+        -------
+        torch.Tensor                 # shape (...,)
+            Height-field value (already multiplied by vertical_scale).
+        """
+        hscale = self.terrain_cfg['horizontal_scale']
+        ix = ((xy[..., 0] / hscale) - 0.5).floor().long()
+        iy = ((xy[..., 1] / hscale) - 0.5).floor().long()
+
+        # clamp for safety
+        ix.clamp_(0, self.height_field.shape[0] - 1)
+        iy.clamp_(0, self.height_field.shape[1] - 1)
+        return self.height_field[ix, iy]

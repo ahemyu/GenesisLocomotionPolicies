@@ -55,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_uneven.py -e go2-uneven-v5-double-envs -r --ckpt 1000
+python eval_uneven.py -e go2-uneven-feet-clearance -r --ckpt 1000
 """
