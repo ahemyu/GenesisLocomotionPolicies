@@ -3,8 +3,10 @@ import os
 import pickle
 import shutil
 
-from simple_go2_env import Go2Env
-from rsl_rl.runners import OnPolicyRunner
+import wandb
+
+from rsl_rl.runners.on_policy_runner import OnPolicyRunner
+from simple_reward_wrapper import RunOnFlatGround
 
 import genesis as gs
 
@@ -47,7 +49,7 @@ def get_train_cfg(exp_name, max_iterations):
             "resume_path": None,
             "run_name": "",
             "runner_class_name": "runner_class_name",
-            "save_interval": 500,
+            "save_interval": 200,
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1,
@@ -104,12 +106,12 @@ def get_cfgs():
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 30.0,
         "resampling_time_s": 4.0,
-        "action_scale": 0.30, # controls maximum angular deviation from the default joint positions
+        "action_scale": 0.15, # controls maximum angular deviation from the default joint positions
         "simulate_action_latency": True,
         "clip_actions": 100.0,
     }
     obs_cfg = {
-        "num_obs": 48,
+        "num_obs": 45,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -118,31 +120,22 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        # 'soft_dof_pos_limit': 0.9, # soft limit for joint position
-        "tracking_sigma": 0.4, # controls how quickly the reward falls off with increasing error
         "base_height_target": 0.35,
         "feet_height_target": 0.1,
         "reward_scales": {
-            "tracking_lin_vel": 3.0, # Reward for matching linear velocity
-            "tracking_ang_vel": 0.2, # Reward for matching angular velocity
             "lin_vel_z": -0.05,      # Penalty for vertical movement
-            "ang_vel_xy": -0.05,     # Penalty for angular velocity in x and y
-            "base_height": -10.0,    # Penalty for incorrect torso height
-            "action_rate": -0.005,   # penalty for rapid action changes
+            "lin_vel_y": -2.,      # Penalty for lateral movement
+            "lin_vel_x": 3., # Reward for absolute linear velocity
+            "ang_vel_xy": -0.2,     # Penalty for angular velocity in x and y
+            "base_height": -20.0,    # Penalty for incorrect torso height
+            "action_rate": -0.02,   # penalty for rapid action changes
             "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
             'orientation': -2.0,      # Penalty for non flat base orientation
-            "absolute_lin_vel": 1.0 , # Reward for absolute linear velocity
-
+            "foot_clearance": 0.5,     # Reward for foot clearance
+            "foot_phase_symmetry": 1.0, # Reward for foot phase symmetry
         },
     }
-    command_cfg = {
-        "num_commands": 3,
-        "lin_vel_x_range": [1.0, 4.0],
-        "lin_vel_y_range": [0, 0],
-        "ang_vel_range": [0, 0],
-    }
-
-    return env_cfg, obs_cfg, reward_cfg, command_cfg
+    return env_cfg, obs_cfg, reward_cfg
 
 
 def main():
@@ -151,21 +144,21 @@ def main():
     parser.add_argument("-B", "--num_envs", type=int, default=1)
     parser.add_argument("--max_iterations", type=int, default=1)
     parser.add_argument('--resume', type=str, default=None)
-    # parser.add_argument('--ckpt', type=int, default=1000)
+    parser.add_argument('--ckpt', type=int, default=1000)
     args = parser.parse_args()
 
     gs.init(logging_level="warning")
 
     log_dir = f"logs/{args.exp_name}"
-    env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
+    env_cfg, obs_cfg, reward_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, args.max_iterations)
 
     if os.path.exists(log_dir):
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
-    env = Go2Env(
-        num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg, command_cfg=command_cfg
+    env = RunOnFlatGround(
+        num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg
     )
 
     runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
@@ -177,15 +170,18 @@ def main():
         runner.load(resume_path)
 
     pickle.dump(
-        [env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg],
+        [env_cfg, obs_cfg, reward_cfg, train_cfg],
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
+    wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True) #setting init_at_random_ep_len to True will cause each 
-
 
 if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_v8 -B 8192 --max_iterations 1000 
+python train_run.py -e go2-running_without_target_v2 -B 8192 --max_iterations 1000 --resume go2-running_without_target_v2 --ckpt 1000
+
+resume: 
+python train_run.py -B 8192 --max_iterations 1000 --resume go2-running_without_target_v2 --ckpt 1000
 """

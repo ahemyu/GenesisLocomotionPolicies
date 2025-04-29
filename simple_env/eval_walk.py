@@ -4,7 +4,7 @@ import pickle
 import torch
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
-from simple_go2_env import Go2Env
+from simple_reward_wrapper import RunOnFlatGround
 
 def main():
     parser = argparse.ArgumentParser()
@@ -16,15 +16,14 @@ def main():
     gs.init()
 
     log_dir = f"logs/{args.exp_name}"
-    env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
+    env_cfg, obs_cfg, reward_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
     reward_cfg["reward_scales"] = {}
 
-    env = Go2Env(
+    env = RunOnFlatGround(
         num_envs=1,
         env_cfg=env_cfg,
         obs_cfg=obs_cfg,
         reward_cfg=reward_cfg,
-        command_cfg=command_cfg,
         show_viewer=False,
     )
 
@@ -47,8 +46,8 @@ def main():
             obs, _, rews, dones, infos = env.step(actions)
             n_frames += 1
             if args.record:
-                if n_frames == 300:
-                    env.stop_recording("go2_running_final.mp4")
+                if n_frames == 600:
+                    env.stop_recording("go2_running_final_2.mp4")
                     exit()
 
 
@@ -56,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk.py -e go2-running_v8 -r --ckpt 1000
+python eval_walk.py -e go2-running_without_target_v2 -r --ckpt 1200
 """
