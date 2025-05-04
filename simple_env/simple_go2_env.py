@@ -331,7 +331,7 @@ class Go2Env:
     def _check_termination(self):
         """Check termination conditions and reset environments if needed"""
         # check termination and reset
-        self.reset_buf = self.episode_length_buf > self.max_episode_length# if we reached 1000 steps, we need to reset the environment
+        self.reset_buf = self.episode_length_buf > self.max_episode_length # if we reached 1500 steps, we need to reset the environment
         self.reset_buf |= torch.abs(self.base_euler[:, 1]) > self.env_cfg["termination_if_pitch_greater_than"]# if pitch(forward/backward tilt) is greater than x degrees, we need to reset the environment
         self.reset_buf |= torch.abs(self.base_euler[:, 0]) > self.env_cfg["termination_if_roll_greater_than"]# if roll(side-to-side tilt) is greater than x degrees, we need to reset the environment
         
@@ -376,6 +376,8 @@ class Go2Env:
                 (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 12, current joint angles relative to default
                 self.dof_vel * self.obs_scales["dof_vel"],  # 12, current joint velocities 
                 self.actions,  # 12 # current actions issued by the policy
+                # TODO; add diff of base_pos and last_base_pos 
+                #TODO; add height diff between current base and height patch in front 
             ],
             axis=-1,
         )
@@ -406,7 +408,7 @@ class Go2Env:
                 self.actions, # 12, current actions issued by the policy
                 self.last_actions, # 12, previous actions
                 self.base_pos, # 3, current base position
-                self.last_base_pos, # 3, previous base position
+                self.last_base_pos, # 3, previous base  #TODO: instead use the difference between the two
             ],
             axis=-1,
         )

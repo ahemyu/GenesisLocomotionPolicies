@@ -63,6 +63,10 @@ class WalkUneven(Go2Env):
         starting_point_x = self.base_init_pos[0].item() # get the x position of the starting point  
         return self.base_pos[:,0] - starting_point_x # calculate progress from starting point
     
+    def _reward_sideway_movement(self):
+        # Penalize sideway movement away from the starting point
+        return torch.abs(self.base_pos[:, 1] - self.base_init_pos[1])
+    
     def _reward_lin_vel_y(self):
         # Penalize y axis base linear velocity
         return torch.square(self.base_lin_vel[:, 1])
@@ -71,14 +75,10 @@ class WalkUneven(Go2Env):
         # Penalize z axis base linear velocity
         return torch.square(self.base_lin_vel[:, 2])
 
-    def _reward_ang_vel_xy(self):
-        # Penalize xy axes base angular velocity
-        return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
-
-    def _reward_orientation(self): # 
-        # Penalize non flat base orientation
-        return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
-
+    def _reward_yaw_deviation(self):
+        # Penalize yaw deviation from the target (so the robot should point straight)
+        return torch.square(self.base_euler[:, 2]) 
+    
     def _reward_action_rate(self):
         # Penalize changes in actions
         return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
@@ -108,10 +108,10 @@ class WalkUneven(Go2Env):
             Mean per-foot reward per environment. 1.0 is full score, 0.0 means all
             swing feet are below the clearance threshold.
         """
-        clearance_thresh = 0.05          # [m]   desired clearance
-        contact_thresh   = 1.0           # [N]   ≈ zero-contact cutoff
+        clearance_thresh = 0.05          #  desired clearance
+        contact_thresh   = 1.0           #  ≈ zero-contact cutoff
 
-        # 1. Ground height directly under each foot (vectorised over env & foot)
+        # Ground height directly under each foot
         hscale = self.terrain_cfg['horizontal_scale']
         # (num_envs, 4)  world X/Y of every foot, clamped to terrain borders
         px = self.foot_positions[:, :, 0].clamp_(0.0, self.terrain_margin[0])
@@ -127,25 +127,18 @@ class WalkUneven(Go2Env):
 
         ground_height = self.height_field[ix, iy]          # (num_envs, 4)
 
-        # ------------------------------------
-        # 2. True clearance of every foot tip
-        # ------------------------------------
+        # True clearance of every foot tip
         clearance = self.foot_positions[:, :, 2] - ground_height    # (env, foot)
 
-        # ---------------------------------------------------
-        # 3. Reward only for swing legs (≈ no contact force)
-        # ---------------------------------------------------
+        #  Reward only for swing legs (≈ no contact force)
         contact_force = torch.norm(
             self.link_contact_forces[:, self.feet_link_indices, :], dim=-1
         )                                                            # (env, foot)
         swing_mask = (contact_force < contact_thresh).float()        # 1 if swing
 
-        # ---------------------------------------------------
-        # 4. Shape reward: linear up to threshold, cap at 1
-        # ---------------------------------------------------
         per_foot_reward = torch.clamp(clearance / clearance_thresh, 0.0, 1.0)
         per_foot_reward = per_foot_reward * swing_mask              # ignore stance feet
 
         # Return mean across the four feet
-        return torch.mean(per_foot_reward, dim=1)
+        return torch.mean(per_foot_reward, dim=1)   
 

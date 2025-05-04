@@ -30,7 +30,7 @@ def get_train_cfg(exp_name, max_iterations):
         "init_member_classes": {},
         "policy": {
             "activation": "elu",
-            "actor_hidden_dims": [512, 256, 128],
+            "actor_hidden_dims": [512, 256, 128],# try fewer
             "critic_hidden_dims": [512, 256, 128],
             "init_noise_std": 1.0,
         },
@@ -91,8 +91,8 @@ def get_cfgs():
             "RL_calf_joint",
         ],
         # PD
-        "kp": 20.0, # we could try lowering to 15 or 10
-        "kd": 0.5, # if joint movements feel springy/jittery we could try increasing to 1.0
+        "kp": 20.0, # proportional gain that multiplies the instantaneous position error (desired − actual joint angle) to produce a corrective torque
+        "kd": 1.0, #  derivative gain that multiplies the time-derivative of the position error (angular velocity error) to generate a damping torque opposing motion
         # termination
         "termination_if_roll_greater_than": 20,  # degree
         "termination_if_pitch_greater_than": 10,
@@ -129,16 +129,17 @@ def get_cfgs():
     }
     reward_cfg = {
         "tracking_sigma": 0.40,         # controls how quickly the reward falls off with increasing error
-        "lin_vel_target": 1.0,          # target linear velocity
+        "lin_vel_target": 1.5,          # target linear velocity
         "reward_scales": {
             "tracking_lin_vel_x": 1.0,    # Reward for tracking x axis base linear velocity
-            "forward_progress_x": 1.0,        # Reward for forward progress
-            "lin_vel_y": -5.0,              # Penalty for y axis base linear velocity
+            "forward_progress_x": 2.0,        # Reward for forward progress
+            "sideway_movement": -0.5,      # Penalty for sideway movement
+            "lin_vel_y": -1.0,              # Penalty for y axis base linear velocity
             "lin_vel_z": -0.1,              # Penalty for z axis base linear velocity
-            "action_rate": -0.005,          # Small penalty for rapid action changes
-            "orientation": -0.01,          # Penalty for orientation not parallel to terrain
+            "action_rate": -0.005,          #  penalty for rapid action changes
             "collision": -1.0,            # Penalty for collision
             "foot_clearance": 1.0,         # Reward for foot clearance
+            "yaw_deviation": -0.05,          # Penalty for yaw deviation
         },
     }
     return env_cfg, obs_cfg, reward_cfg
@@ -198,7 +199,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_uneven.py -e go2-uneven-feet-clearance -B 4096 --max_iterations 1000
+python train_uneven.py -e go2-uneven-test-2 -B 4096 --max_iterations 1000
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000
