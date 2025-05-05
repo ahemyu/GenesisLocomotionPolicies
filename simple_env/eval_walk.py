@@ -4,7 +4,7 @@ import pickle
 import torch
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
-from simple_reward_wrapper import RunOnFlatGround
+from simple_reward_wrapper import WalkFlat
 
 def main():
     parser = argparse.ArgumentParser()
@@ -16,18 +16,18 @@ def main():
     gs.init()
 
     log_dir = f"logs/{args.exp_name}"
-    env_cfg, obs_cfg, reward_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
+    env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
     reward_cfg["reward_scales"] = {}
 
-    env = RunOnFlatGround(
+    env = WalkFlat(
         num_envs=1,
         env_cfg=env_cfg,
         obs_cfg=obs_cfg,
         reward_cfg=reward_cfg,
+        command_cfg=command_cfg,
         show_viewer=False,
     )
 
-    args.max_iterations = 1
     runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
     resume_path = os.path.join(log_dir, f"model_{args.ckpt}.pt")
     runner.load(resume_path)
@@ -47,7 +47,7 @@ def main():
             n_frames += 1
             if args.record:
                 if n_frames == 600:
-                    env.stop_recording("go2_running_final_2.mp4")
+                    env.stop_recording(f"{args.exp_name}.mp4")
                     exit()
 
 
@@ -55,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk.py -e go2-running_without_target_v2 -r --ckpt 1200
+python eval_walk.py -e go2-walking -r --ckpt 100
 """

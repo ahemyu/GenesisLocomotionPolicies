@@ -1,6 +1,35 @@
 from simple_go2_env import Go2Env
 import torch 
 
+
+class WalkFlat(Go2Env):
+
+    def _reward_tracking_lin_vel(self):
+        # Tracking of linear velocity commands (xy axes)
+        lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
+        return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
+
+    def _reward_tracking_ang_vel(self):
+        # Tracking of angular velocity commands (yaw)
+        ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
+        return torch.exp(-ang_vel_error / self.reward_cfg["tracking_sigma"])
+
+    def _reward_lin_vel_z(self):
+        # Penalize z axis base linear velocity
+        return torch.square(self.base_lin_vel[:, 2])
+
+    def _reward_action_rate(self):
+        # Penalize changes in actions
+        return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
+
+    def _reward_similar_to_default(self):
+        # Penalize joint poses far away from default pose
+        return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1)
+
+    def _reward_base_height(self):
+        # Penalize base height away from target
+        return torch.square(self.base_pos[:, 2] - self.reward_cfg["base_height_target"])
+
 class RunOnFlatGround(Go2Env):
 
     def _reward_lin_vel_x(self):
@@ -98,47 +127,47 @@ class WalkUneven(Go2Env):
             dim=1,
         )
     
-    def _reward_foot_clearance(self) -> torch.Tensor:
-        """
-        Reward each swing leg for clearing at least 5 cm above the local ground height.
+    # def _reward_foot_clearance(self) -> torch.Tensor:
+    #     """
+    #     Reward each swing leg for clearing at least 5 cm above the local ground height.
 
-        Returns
-        -------
-        torch.Tensor  # shape: (num_envs,)
-            Mean per-foot reward per environment. 1.0 is full score, 0.0 means all
-            swing feet are below the clearance threshold.
-        """
-        clearance_thresh = 0.05          #  desired clearance
-        contact_thresh   = 1.0           #  ≈ zero-contact cutoff
+    #     Returns
+    #     -------
+    #     torch.Tensor  # shape: (num_envs,)
+    #         Mean per-foot reward per environment. 1.0 is full score, 0.0 means all
+    #         swing feet are below the clearance threshold.
+    #     """
+    #     clearance_thresh = 0.05          #  desired clearance
+    #     contact_thresh   = 1.0           #  ≈ zero-contact cutoff
 
-        # Ground height directly under each foot
-        hscale = self.terrain_cfg['horizontal_scale']
-        # (num_envs, 4)  world X/Y of every foot, clamped to terrain borders
-        px = self.foot_positions[:, :, 0].clamp_(0.0, self.terrain_margin[0])
-        py = self.foot_positions[:, :, 1].clamp_(0.0, self.terrain_margin[1])
+    #     # Ground height directly under each foot
+    #     hscale = self.terrain_cfg['horizontal_scale']
+    #     # (num_envs, 4)  world X/Y of every foot, clamped to terrain borders
+    #     px = self.foot_positions[:, :, 0].clamp_(0.0, self.terrain_margin[0])
+    #     py = self.foot_positions[:, :, 1].clamp_(0.0, self.terrain_margin[1])
 
-        # Convert world coords → discrete height-field indices
-        ix = ((px / hscale) - 0.5).floor().long()
-        iy = ((py / hscale) - 0.5).floor().long()
+    #     # Convert world coords → discrete height-field indices
+    #     ix = ((px / hscale) - 0.5).floor().long()
+    #     iy = ((py / hscale) - 0.5).floor().long()
 
-        # Guard against out-of-range indices
-        ix.clamp_(0, self.height_field.shape[0] - 1)
-        iy.clamp_(0, self.height_field.shape[1] - 1)
+    #     # Guard against out-of-range indices
+    #     ix.clamp_(0, self.height_field.shape[0] - 1)
+    #     iy.clamp_(0, self.height_field.shape[1] - 1)
 
-        ground_height = self.height_field[ix, iy]          # (num_envs, 4)
+    #     ground_height = self.height_field[ix, iy]          # (num_envs, 4)
 
-        # True clearance of every foot tip
-        clearance = self.foot_positions[:, :, 2] - ground_height    # (env, foot)
+    #     # True clearance of every foot tip
+    #     clearance = self.foot_positions[:, :, 2] - ground_height    # (env, foot)
 
-        #  Reward only for swing legs (≈ no contact force)
-        contact_force = torch.norm(
-            self.link_contact_forces[:, self.feet_link_indices, :], dim=-1
-        )                                                            # (env, foot)
-        swing_mask = (contact_force < contact_thresh).float()        # 1 if swing
+    #     #  Reward only for swing legs (≈ no contact force)
+    #     contact_force = torch.norm(
+    #         self.link_contact_forces[:, self.feet_link_indices, :], dim=-1
+    #     )                                                            # (env, foot)
+    #     swing_mask = (contact_force < contact_thresh).float()        # 1 if swing
 
-        per_foot_reward = torch.clamp(clearance / clearance_thresh, 0.0, 1.0)
-        per_foot_reward = per_foot_reward * swing_mask              # ignore stance feet
+    #     per_foot_reward = torch.clamp(clearance / clearance_thresh, 0.0, 1.0)
+    #     per_foot_reward = per_foot_reward * swing_mask              # ignore stance feet
 
-        # Return mean across the four feet
-        return torch.mean(per_foot_reward, dim=1)   
+    #     # Return mean across the four feet
+    #     return torch.mean(per_foot_reward, dim=1)   
 

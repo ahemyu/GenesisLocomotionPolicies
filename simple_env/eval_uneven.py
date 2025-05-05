@@ -28,7 +28,8 @@ def main():
     )
 
     args.max_iterations = 1
-    runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
+    from train_uneven import get_train_cfg
+    runner = OnPolicyRunner(env, get_train_cfg(args), log_dir, device='cuda:0')
     resume_path = os.path.join(log_dir, f"model_{args.ckpt}.pt")
     runner.load(resume_path)
     policy = runner.get_inference_policy(device="cuda:0")

@@ -186,10 +186,7 @@ def main():
         print('==> resume training from', resume_path)
         runner.load(resume_path)
 
-    pickle.dump(
-        [env_cfg, obs_cfg, reward_cfg, train_cfg],
-        open(f"{log_dir}/cfgs.pkl", "wb"),
-    )
+# 
     wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
 

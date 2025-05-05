@@ -13,12 +13,12 @@ def gs_rand_float(lower, upper, shape, device):
 
 
 class Go2Env:
-    def __init__(self, num_envs, env_cfg, obs_cfg, reward_cfg, show_viewer=False, device="cuda"):
+    def __init__(self, num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg = None, show_viewer=False, device="cuda"):
         self.device = torch.device(device)
         self.show_viewer = show_viewer
 
         # Configuration parameters
-        self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg)
+        self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg)
         
         # Create simulation scene
         self._setup_scene(self.show_viewer)
@@ -47,7 +47,7 @@ class Go2Env:
         # Find link indices for different parts of the robot
         self._find_link_indices()
 
-    def _initialize_env_parameters(self, num_envs, env_cfg, obs_cfg, reward_cfg):
+    def _initialize_env_parameters(self, num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg):
         """Initialize environment parameters from configuration"""
         self.num_envs: int = num_envs
         self.num_obs: int = obs_cfg["num_obs"] #45
@@ -64,7 +64,15 @@ class Go2Env:
         self.reward_cfg: dict = reward_cfg
         self.obs_scales: dict = obs_cfg["obs_scales"]
         self.reward_scales: dict = reward_cfg["reward_scales"]
+        self.command_cfg: dict = command_cfg
         
+        if self.command_cfg is not None:
+            self.num_commands = self.command_cfg["num_commands"]
+            self.commands = torch.zeros((self.num_envs, self.num_commands), device=gs.device, dtype=gs.tc_float)
+            self.commands[:, 0] = self.command_cfg["lin_vel_x_target"]
+            self.commands[:, 1] = self.command_cfg["lin_vel_y_target"]
+            self.commands[:, 2] = self.command_cfg["ang_vel_target"]
+    
         # Camera and recording related variables
         self.headless: bool = not self.show_viewer
         self._recording: bool = False
@@ -385,13 +393,7 @@ class Go2Env:
         # clip observations to prevent extreme values
         # clip_obs = 100.0
         # self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
-        
-        #TODO: try adding these informations: 
-        # foot contact states
-        # contact forces
-        # local terrain ahead of the robot
-        # terrain slope/gradient
-        
+
         if self.num_privileged_obs:
             self._compute_privileged_observations()
 
@@ -523,27 +525,3 @@ class Go2Env:
         if save_path is not None:
             print("fps", int(1 / self.dt))
             self._floating_camera.stop_recording(save_path, fps=int(1 / self.dt))
-    
-    ### Helper functions ###
-    def _ground_height_at(self, xy: torch.Tensor) -> torch.Tensor:
-        """
-        Return terrain height at world (x, y).
-
-        Parameters
-        ----------
-        xy : torch.Tensor            # shape (..., 2)
-            World coordinates in metres.
-
-        Returns
-        -------
-        torch.Tensor                 # shape (...,)
-            Height-field value (already multiplied by vertical_scale).
-        """
-        hscale = self.terrain_cfg['horizontal_scale']
-        ix = ((xy[..., 0] / hscale) - 0.5).floor().long()
-        iy = ((xy[..., 1] / hscale) - 0.5).floor().long()
-
-        # clamp for safety
-        ix.clamp_(0, self.height_field.shape[0] - 1)
-        iy.clamp_(0, self.height_field.shape[1] - 1)
-        return self.height_field[ix, iy]

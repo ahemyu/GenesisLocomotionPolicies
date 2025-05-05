@@ -6,6 +6,7 @@ imgui.ini
 sftp-config.json
 *.mp4
 .github_access_token.txt
+complicated_env/rsl_rl
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -4,8 +4,8 @@ import torch
 import genesis as gs
 from genesis.engine.solvers.rigid.rigid_solver_decomp import RigidSolver
 from utils import *
-class LocoEnv:
 
+class LocoEnv:
     def __init__(
         self,
         num_envs,
@@ -20,25 +20,25 @@ class LocoEnv:
     ) -> None:
         self.num_envs = 1 if num_envs == 0 else num_envs
         self.num_build_envs = num_envs
-        self.num_single_obs = obs_cfg['num_obs'] # 45 for walking 
-        self.num_obs = self.num_single_obs * obs_cfg['num_history_obs'] #45 for walking
-        self.num_privileged_obs = obs_cfg['num_priv_obs'] # 60 for walking
-        self.num_actions = env_cfg['num_actions'] #12, one for each joint
-        self.num_commands = command_cfg['num_commands'] #4 
+        self.num_single_obs = obs_cfg['num_obs']
+        self.num_obs = self.num_single_obs * obs_cfg['num_history_obs']
+        self.num_privileged_obs = obs_cfg['num_priv_obs']
+        self.num_actions = env_cfg['num_actions']
+        self.num_commands = command_cfg['num_commands']
 
         self.headless = not show_viewer
         self.eval = eval
         self.debug = debug
 
-        self.dt = 1 / env_cfg['control_freq'] #1/50
+        self.dt = 1 / env_cfg['control_freq']
         if env_cfg['use_implicit_controller']:
             sim_dt = self.dt
             sim_substeps = env_cfg['decimation']
         else:
-            sim_dt = self.dt / env_cfg['decimation'] # 1/50/4 = 0.005
+            sim_dt = self.dt / env_cfg['decimation']
             sim_substeps = 1
-        self.max_episode_length_s = env_cfg['episode_length_s'] #20s
-        self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt) #4000
+        self.max_episode_length_s = env_cfg['episode_length_s']
+        self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
 
         self.obs_cfg = obs_cfg
         self.obs_scales = obs_cfg['obs_scales']
@@ -59,6 +59,7 @@ class LocoEnv:
         else:
             assert device in ['cpu', 'cuda']
             self.device = torch.device(device)
+
         # create scene
         self.scene = gs.Scene(
             sim_options=gs.options.SimOptions(
@@ -66,7 +67,7 @@ class LocoEnv:
                 substeps=sim_substeps,
             ),
             viewer_options=gs.options.ViewerOptions(
-                max_FPS=int(1 / self.dt * self.env_cfg['decimation']), #200
+                max_FPS=int(1 / self.dt * self.env_cfg['decimation']),
                 camera_pos=(2.0, 0.0, 2.5),
                 camera_lookat=(0.0, 0.0, 0.5),
                 camera_fov=40,
@@ -111,6 +112,8 @@ class LocoEnv:
             self.height_field = torch.tensor(
                 height_field, device=self.device, dtype=gs.tc_float
             ) * self.terrain_cfg['vertical_scale']
+
+            # TODO: adjust base_init_pos based on terrain height
         else:
             self.scene.add_entity(
             gs.morphs.URDF(file='urdf/plane/plane.urdf', fixed=True),
@@ -133,8 +136,7 @@ class LocoEnv:
             visualize_contact=self.debug,
         )
 
-        if gs.platform != 'macOS':
-            self._set_camera()
+        self._set_camera()
 
         # build
         self.scene.build(n_envs=num_envs)
@@ -173,31 +175,31 @@ class LocoEnv:
 
     def _init_buffers(self):
         self.base_euler = torch.zeros(
-            (self.num_envs, 3), device=self.device, dtype=gs.tc_float 
-        ) #base orientation of robot
+            (self.num_envs, 3), device=self.device, dtype=gs.tc_float
+        )
         self.base_lin_vel = torch.zeros(
             (self.num_envs, 3), device=self.device, dtype=gs.tc_float
-        ) # base linear velocity of robot
+        )
         self.base_ang_vel = torch.zeros(
             (self.num_envs, 3), device=self.device, dtype=gs.tc_float
-        ) # base angular velocity of robot
+        )
         self.projected_gravity = torch.zeros(
             (self.num_envs, 3), device=self.device, dtype=gs.tc_float
-        ) # gravity vector in robot's frame
+        )
         self.global_gravity = torch.tensor(
             np.array([0.0, 0.0, -1.0]), device=self.device, dtype=gs.tc_float
-        ) #gravity vector of world frame
+        )
         self.forward_vec = torch.zeros(
             (self.num_envs, 3), device=self.device, dtype=gs.tc_float
-        ) # forward direction
+        )
         self.forward_vec[:, 0] = 1.0
 
         self.obs_buf = torch.zeros(
             (self.num_envs, self.num_single_obs), device=self.device, dtype=gs.tc_float
-        )# current observations (inputs to policy network)
+        )
         self.obs_history_buf = torch.zeros(
             (self.num_envs, self.num_obs), device=self.device, dtype=gs.tc_float
-        ) # same as obs_buf but with history (in case of walking it's the same)
+        )
         self.obs_noise = torch.zeros(
             (self.num_envs, self.num_single_obs), device=self.device, dtype=gs.tc_float
         )
@@ -349,7 +351,6 @@ class LocoEnv:
         )
 
         # PD control
-        # turn actions into joint torques
         stiffness = self.env_cfg['PD_stiffness']
         damping = self.env_cfg['PD_damping']
 
@@ -357,8 +358,8 @@ class LocoEnv:
         for dof_name in self.env_cfg['dof_names']:
             for key in stiffness.keys():
                 if key in dof_name:
-                    self.p_gains.append(stiffness[key]) #30 
-                    self.d_gains.append(damping[key]) # 
+                    self.p_gains.append(stiffness[key])
+                    self.d_gains.append(damping[key])
         self.p_gains = torch.tensor(self.p_gains, device=self.device)
         self.d_gains = torch.tensor(self.d_gains, device=self.device)
         self.batched_p_gains = self.p_gains[None, :].repeat(self.num_envs, 1)
@@ -488,7 +489,7 @@ class LocoEnv:
                 self.base_pos[:, 0] < 1,
                 self.base_pos[:, 1] < 1,
             )
-        self.reset_buf |= self.base_pos[:, 2] < self.env_cfg['termination_if_height_lower_than']
+        self.reset_buf |= self.base_pos[:, 2] < self.env_cfg['termination_if_height_lower_than'] # TODO; remove this for terrain 
         self.reset_buf |= self.time_out_buf
 
     def compute_reward(self):
@@ -551,10 +552,7 @@ class LocoEnv:
         # self.rigid_solver.forward_kinematics() # no need currently
         self.compute_observations()
 
-        if gs.platform != 'macOS':
-            self._render_headless()
-        if not self.headless and self.debug:
-            self._draw_debug_vis()
+        self._render_headless()
 
         self.last_actions[:] = self.actions[:]
         self.last_last_actions[:] = self.last_actions[:]
@@ -567,9 +565,9 @@ class LocoEnv:
                 self.base_ang_vel * self.obs_scales['ang_vel'],                     # 3
                 self.projected_gravity,                                             # 3
                 self.commands[:, :3] * self.commands_scale,                         # 3
-                (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'], # 12
-                self.dof_vel * self.obs_scales['dof_vel'], #12
-                self.actions, #12 actions 
+                (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'],
+                self.dof_vel * self.obs_scales['dof_vel'],
+                self.actions,
             ],
             axis=-1,
         )
@@ -610,6 +608,7 @@ class LocoEnv:
         self.obs_noise[33:45] = self.obs_cfg['obs_noise']['dof_vel']
 
     def _resample_commands(self, envs_idx):
+        # TODO: remove this 
         # resample commands
 
         # lin_vel
@@ -651,32 +650,10 @@ class LocoEnv:
         )
 
         # reset root states - position
-        # Start the robot farther from the edge of the terrain
-        init_xy = torch.tensor([4.0, 3.0], device=self.device)
-        
-        # Apply some small randomization to the starting position
-        self.base_pos[envs_idx, :2] = init_xy + gs_rand_float(
-            -0.5, 0.5, (len(envs_idx), 2), self.device
+        self.base_pos[envs_idx] = self.base_init_pos
+        self.base_pos[envs_idx, :2] += gs_rand_float(
+            -1.0, 1.0, (len(envs_idx), 2), self.device
         )
-        
-        # Sample terrain height at the robot's position for proper initialization
-        if self.env_cfg['use_terrain']:
-            clipped_base_pos = self.base_pos[envs_idx, :2].clamp(
-                min=torch.zeros(2, device=self.device), 
-                max=self.terrain_margin
-            )
-            
-            # Calculate terrain height at robot position
-            height_field_ids = (clipped_base_pos / self.terrain_cfg['horizontal_scale'] - 0.5).floor().int()
-            height_field_ids = height_field_ids.clamp(min=0)
-            terrain_heights = self.height_field[height_field_ids[:, 0], height_field_ids[:, 1]]
-            
-            # Place robot slightly above the terrain surface
-            self.base_pos[envs_idx, 2] = terrain_heights + 0.5  # 0.5m above terrain
-        else:
-            self.base_pos[envs_idx, 2] = self.base_init_pos[2]
-        
-        # Set the orientation    
         self.base_quat[envs_idx] = self.base_init_quat.reshape(1, -1)
         base_euler = gs_rand_float(
             -0.1, 0.1, (len(envs_idx), 3), self.device
@@ -686,8 +663,6 @@ class LocoEnv:
             gs_euler2quat(base_euler),
             self.base_quat[envs_idx],
         )
-        
-        # Apply changes to the robot
         self.robot.set_pos(
             self.base_pos[envs_idx], zero_velocity=False, envs_idx=envs_idx
         )
@@ -880,56 +855,54 @@ class LocoEnv:
                     * (max_scale - min_scale) + min_scale
         self.batched_d_gains[env_ids, :] = kd_scales * self.d_gains[None, :]
 
-    def _draw_debug_vis(self):
-        ''' Draws visualizations for dubugging (slows down simulation a lot).
-            Default behaviour: draws height measurement points
-        '''
-        self.scene.clear_debug_objects()
+    # def _draw_debug_vis(self):
+    #     ''' Draws visualizations for dubugging (slows down simulation a lot).
+    #         Default behaviour: draws height measurement points
+    #     '''
+    #     self.scene.clear_debug_objects()
 
-        foot_poss = self.foot_positions[0].reshape(-1, 3)
-        # self.scene.draw_debug_spheres(poss=foot_poss, radius=0.03, color=(1, 0, 0, 0.7))
+    #     foot_poss = self.foot_positions[0].reshape(-1, 3)
+    #     # self.scene.draw_debug_spheres(poss=foot_poss, radius=0.03, color=(1, 0, 0, 0.7))
 
-        foot_poss = foot_poss.cpu()
-        self.scene.draw_debug_line(foot_poss[0], foot_poss[3], radius=0.002, color=(1, 0, 0, 0.7))
-        self.scene.draw_debug_line(foot_poss[1], foot_poss[2], radius=0.002, color=(1, 0, 0, 0.7))
+    #     foot_poss = foot_poss.cpu()
+    #     self.scene.draw_debug_line(foot_poss[0], foot_poss[3], radius=0.002, color=(1, 0, 0, 0.7))
+    #     self.scene.draw_debug_line(foot_poss[1], foot_poss[2], radius=0.002, color=(1, 0, 0, 0.7))
 
-        com = self.com[0]
-        # self.scene.draw_debug_sphere(pos=com, radius=0.1, color=(0, 0, 1, 0.7))
+    #     com = self.com[0]
+    #     # self.scene.draw_debug_sphere(pos=com, radius=0.1, color=(0, 0, 1, 0.7))
 
-        com[2] = 0.02 + self.terrain_heights[0]
-        self.scene.draw_debug_sphere(pos=com, radius=0.02, color=(0, 0, 1, 0.7))
+    #     com[2] = 0.02 + self.terrain_heights[0]
+    #     self.scene.draw_debug_sphere(pos=com, radius=0.02, color=(0, 0, 1, 0.7))
 
+    # ------------ Camera Setup ----------------
     def _set_camera(self):
-        ''' Set camera position and direction
-        '''
+        '''Set camera position and direction for recording'''
         self._floating_camera = self.scene.add_camera(
-            pos=np.array([0, -1, 1]),
-            lookat=np.array([0, 0, 0]),
-            # res=(720, 480),
-            fov=40,
+            pos=np.array([-1.5, 0.0, 1.2]),  # Behind and elevated
+            lookat=np.array([0, 0, 0.1]),    # Looking at the robot
+            fov=45,                          # Changed from 40
             GUI=False,
+            res=(720, 720),               # Resolution of the camera
         )
-
         self._recording = False
         self._recorded_frames = []
 
+
     def _render_headless(self):
-        if self._recording and len(self._recorded_frames) < 150:
+        '''Render frames for recording when in headless mode'''
+        if self._recording and len(self._recorded_frames) < 1009:
             robot_pos = np.array(self.base_pos[0].cpu())
-            self._floating_camera.set_pose(pos=robot_pos + np.array([-1, -1, 0.5]), lookat=robot_pos + np.array([0, 0, -0.1]))
-            # import time
-            # start = time.time()
+            self._floating_camera.set_pose(
+                pos=robot_pos + np.array([-1.5, 0.0, 2.2]),  # Position camera behind and above robot
+                lookat=robot_pos + np.array([0.3, 0, 0.1])   # Look slightly ahead of the robot
+            )
             frame, _, _, _ = self._floating_camera.render()
-            # end = time.time()
-            # print(end-start)
             self._recorded_frames.append(frame)
-            # from PIL import Image
-            # img = Image.fromarray(np.uint8(frame))
-            # img.save('./test.png')
-            # print('save')
 
     def get_recorded_frames(self):
-        if len(self._recorded_frames) == 150:
+        '''Return the recorded frames and reset recording state'''
+        print("We have recorded", len(self._recorded_frames), "frames")
+        if len(self._recorded_frames) == 1008:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False
@@ -938,16 +911,16 @@ class LocoEnv:
             return None
 
     def start_recording(self, record_internal=True):
+        '''Start recording frames'''
         self._recorded_frames = []
         self._recording = True
-        if record_internal:
-            self._record_frames = True
-        else:
+        if not record_internal:
             self._floating_camera.start_recording()
 
     def stop_recording(self, save_path=None):
+        '''Stop recording and optionally save to a file'''
         self._recorded_frames = []
         self._recording = False
         if save_path is not None:
             print("fps", int(1 / self.dt))
-            self._floating_camera.stop_recording(save_path, fps = int(1 / self.dt))
+            self._floating_camera.stop_recording(save_path, fps=int(1 / self.dt))
