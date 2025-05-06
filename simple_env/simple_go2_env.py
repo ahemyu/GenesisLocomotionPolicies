@@ -17,7 +17,7 @@ class Go2Env:
         self.device = torch.device(device)
         self.show_viewer = show_viewer
         self.eval = eval
-        self.num_frames = 1001 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
+        self.num_frames = 1489 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
 
         # Configuration parameters
         self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg)

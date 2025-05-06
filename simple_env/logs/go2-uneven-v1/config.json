@@ -36,7 +36,7 @@
             "RL_calf_joint"
         ],
         "kp": 20.0,
-        "kd": 0.5,
+        "kd": 1.0,
         "termination_if_roll_greater_than": 20,
         "termination_if_pitch_greater_than": 10,
         "base_init_quat": [
@@ -46,15 +46,14 @@
             0.0
         ],
         "episode_length_s": 30.0,
-        "resampling_time_s": 4.0,
-        "action_scale": 0.3,
+        "action_scale": 0.25,
         "simulate_action_latency": true,
         "clip_actions": 100.0,
         "use_terrain": true,
         "terrain_cfg": {
             "subterrain_types": "pyramid_stairs_terrain",
             "n_subterrains": [
-                3,
+                2,
                 1
             ],
             "subterrain_size": [
@@ -80,8 +79,7 @@
         ]
     },
     "obs_cfg": {
-        "num_obs": 45,
-        "num_priviliged_obs": 75,
+        "num_obs": 48,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -90,16 +88,14 @@
         }
     },
     "reward_cfg": {
-        "tracking_sigma": 0.4,
-        "lin_vel_target": 1.5,
+        "tracking_sigma": 0.3,
         "reward_scales": {
-            "tracking_lin_vel_x": 1.0,   
-            "forward_progress_x": 2.0,       
-            "lin_vel_y": -5.0,          
-            "lin_vel_z": -0.1,         
-            "action_rate": -0.005,      
-            "orientation": -0.01,     
-            "collision": -1.0 
+            "tracking_lin_vel_x": 1.0,
+            "tracking_ang_vel": 0.5,
+            "tracking_lin_vel_y": 1.0,
+            "lin_vel_z": -1.0,
+            "action_rate": -0.005,
+            "similar_to_default": -0.1
         }
     },
     "train_cfg": {
@@ -138,8 +134,8 @@
             "experiment_name": "go2-uneven-v1",
             "load_run": -1,
             "log_interval": 1,
-            "max_iterations": 1000,
-            "num_steps_per_env": 128,
+            "max_iterations": 500,
+            "num_steps_per_env": 24,
             "policy_class_name": "ActorCritic",
             "record_interval": 100,
             "resume": false,
@@ -151,5 +147,11 @@
         "runner_class_name": "OnPolicyRunner",
         "seed": 1
     },
-    "num_envs": 8192
+    "command_cfg": {
+        "num_commands": 3,
+        "lin_vel_x_target": 0.5,
+        "lin_vel_y_target": 0,
+        "ang_vel_target": 0
+    },
+    "num_envs": 4096
 }
