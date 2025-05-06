@@ -9,6 +9,10 @@ class WalkFlat(Go2Env):
         lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
         return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
 
+    def _reward_sideway_movement(self):
+        # Penalize sideway movement away from the starting point
+        return torch.abs(self.base_pos[:, 1] - self.base_init_pos[1])
+    
     def _reward_tracking_ang_vel(self):
         # Tracking of angular velocity commands (yaw)
         ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])

@@ -134,7 +134,7 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        "tracking_sigma": 0.25,
+        "tracking_sigma": 0.30,
         "base_height_target": 0.3,
         "reward_scales": {
             "tracking_lin_vel": 1.0,
@@ -143,6 +143,7 @@ def get_cfgs():
             "base_height": -50.0,
             "action_rate": -0.005,
             "similar_to_default": -0.1,
+            "sideway_movement": -0.25
         },
     }
     command_cfg = {
@@ -159,7 +160,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--exp_name", type=str, default="go2-walking")
     parser.add_argument("-B", "--num_envs", type=int, default=4096)
-    parser.add_argument("--max_iterations", type=int, default=200)
+    parser.add_argument("--max_iterations", type=int, default=300)
     args = parser.parse_args()
 
     gs.init(
@@ -197,7 +198,7 @@ if __name__ == '__main__':
 
 '''
 # training
-python train_walk.py
+python train_walk.py -e go2-walking-v2 --max_iterations 400
 
 # evaluation
 python eval_backflip.py -e EXP_NAME --ckpt NUM_CKPT
