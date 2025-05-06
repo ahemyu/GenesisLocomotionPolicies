@@ -384,8 +384,7 @@ class Go2Env:
                 (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 12, current joint angles relative to default
                 self.dof_vel * self.obs_scales["dof_vel"],  # 12, current joint velocities 
                 self.actions,  # 12 # current actions issued by the policy
-                # TODO; add diff of base_pos and last_base_pos 
-                #TODO; add height diff between current base and height patch in front 
+                self.base_pos - self.last_base_pos,  # 3, difference between previous and current base position 
             ],
             axis=-1,
         )
@@ -409,8 +408,7 @@ class Go2Env:
                 self.last_dof_vel * self.obs_scales['dof_vel'],  # 12, previous joint velocities
                 self.actions, # 12, current actions issued by the policy
                 self.last_actions, # 12, previous actions
-                self.base_pos, # 3, current base position
-                self.last_base_pos, # 3, previous base  #TODO: instead use the difference between the two
+                self.base_pos - self.last_base_pos, # 3, difference between previous and current base position
             ],
             axis=-1,
         )
@@ -478,6 +476,13 @@ class Go2Env:
         self.reset_idx(torch.arange(self.num_envs, device=self.device))
         return self.obs_buf, None
     
+
+    def increase_x_target(self, delta):
+        """Increase the x target velocity by delta"""
+        mask: torch.Tensor = self.commands[:, 0] < 1.0 # mask to select environments where the x target velocity is less than 1.5
+        self.commands[mask, 0] += delta 
+
+
     # ------------ Camera and recording functions ----------------
     def _set_camera(self):
         '''Set camera position and direction for recording'''
@@ -491,7 +496,7 @@ class Go2Env:
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 1153:
+        if self._recording and len(self._recorded_frames) < 241:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
                 pos=robot_pos + np.array([-1.5, 0.0, 2.2]),  # Position camera behind and above robot
@@ -503,7 +508,7 @@ class Go2Env:
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
         print("We have recorded", len(self._recorded_frames), "frames")
-        if len(self._recorded_frames) == 1152:
+        if len(self._recorded_frames) == 240:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False

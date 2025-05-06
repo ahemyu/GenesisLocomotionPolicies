@@ -4,20 +4,26 @@ import torch
 
 class WalkFlat(Go2Env):
 
-    def _reward_tracking_lin_vel(self):
+    def _reward_tracking_lin_vel_x(self):
         # Tracking of linear velocity commands (xy axes)
-        lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
+        lin_vel_error = torch.square(self.commands[:, 0] - self.base_lin_vel[:, 0])
+        return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
+    
+    def _reward_tracking_lin_vel_y(self):
+        # Tracking of linear velocity commands (xy axes)
+        lin_vel_error = torch.square(self.commands[:, 1] - self.base_lin_vel[:, 1])
         return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
 
-    def _reward_sideway_movement(self):
-        # Penalize sideway movement away from the starting point
-        return torch.abs(self.base_pos[:, 1] - self.base_init_pos[1])
+    # def _reward_sideway_movement(self):
+    #     # Penalize sideway movement away from the starting point
+    #     return torch.abs(self.base_pos[:, 1] - self.base_init_pos[1])
     
     def _reward_tracking_ang_vel(self):
         # Tracking of angular velocity commands (yaw)
         ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
         return torch.exp(-ang_vel_error / self.reward_cfg["tracking_sigma"])
 
+    
     def _reward_lin_vel_z(self):
         # Penalize z axis base linear velocity
         return torch.square(self.base_lin_vel[:, 2])
@@ -33,7 +39,7 @@ class WalkFlat(Go2Env):
     def _reward_base_height(self):
         # Penalize base height away from target
         return torch.square(self.base_pos[:, 2] - self.reward_cfg["base_height_target"])
-
+    
 class RunOnFlatGround(Go2Env):
 
     def _reward_lin_vel_x(self):

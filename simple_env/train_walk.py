@@ -43,7 +43,7 @@ def get_train_cfg(args):
             'max_iterations': args.max_iterations,
             'num_steps_per_env': 24,
             'policy_class_name': 'ActorCritic',
-            'record_interval': 50,
+            'record_interval': 100,
             'resume': False,
             'resume_path': None,
             'run_name': '',
@@ -63,18 +63,18 @@ def get_cfgs():
         "num_actions": 12,
         # joint/link names
         "default_joint_angles": {  # [rad]
-            "FL_hip_joint": 0.0,
-            "FR_hip_joint": 0.0,
-            "RL_hip_joint": 0.0,
-            "RR_hip_joint": 0.0,
-            "FL_thigh_joint": 0.8,
-            "FR_thigh_joint": 0.8,
-            "RL_thigh_joint": 1.0,
-            "RR_thigh_joint": 1.0,
-            "FL_calf_joint": -1.5,
-            "FR_calf_joint": -1.5,
-            "RL_calf_joint": -1.5,
-            "RR_calf_joint": -1.5,
+            "FL_hip_joint": 0.0, #0
+            "FR_hip_joint": 0.0,#1
+            "RL_hip_joint": 0.0,#2
+            "RR_hip_joint": 0.0,#3
+            "FL_thigh_joint": 0.8,#4
+            "FR_thigh_joint": 0.8,#5
+            "RL_thigh_joint": 1.0,#6
+            "RR_thigh_joint": 1.0,#7
+            "FL_calf_joint": -1.5,#8
+            "FR_calf_joint": -1.5,#9
+            "RL_calf_joint": -1.5,#10
+            "RR_calf_joint": -1.5,#11
         },
         "joint_names": [
             "FR_hip_joint",
@@ -125,7 +125,7 @@ def get_cfgs():
         'base_link_name': ['base'],
     }
     obs_cfg = {
-        "num_obs": 45,
+        "num_obs": 48,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -137,13 +137,14 @@ def get_cfgs():
         "tracking_sigma": 0.30,
         "base_height_target": 0.3,
         "reward_scales": {
-            "tracking_lin_vel": 1.0,
-            "tracking_ang_vel": 0.2,
+            "tracking_lin_vel_x": 1.0,
+            "tracking_ang_vel": 0.5,
+            "lin_vel_y": -1.0,
             "lin_vel_z": -1.0,
             "base_height": -50.0,
             "action_rate": -0.005,
             "similar_to_default": -0.1,
-            "sideway_movement": -0.25
+            # "sideway_movement": -0.25,
         },
     }
     command_cfg = {
@@ -189,7 +190,7 @@ def main():
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
 
-    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True, curriculum=True) # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
 
 
 if __name__ == '__main__':
@@ -198,7 +199,7 @@ if __name__ == '__main__':
 
 '''
 # training
-python train_walk.py -e go2-walking-v2 --max_iterations 400
+python train_walk.py -e go2-walking-v2 --max_iterations 500 
 
 # evaluation
 python eval_backflip.py -e EXP_NAME --ckpt NUM_CKPT
