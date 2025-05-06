@@ -17,7 +17,7 @@ class Go2Env:
         self.device = torch.device(device)
         self.show_viewer = show_viewer
         self.eval = eval
-        self.num_frames = 1489 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
+        self.num_frames = 1993 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
 
         # Configuration parameters
         self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg)
@@ -58,7 +58,7 @@ class Go2Env:
 
         self.simulate_action_latency: bool = True  # there is a 1 step latency on real robot
         self.dt: float = 0.02  # control frequency on real robot is 50hz (0.02 = 1/50)
-        self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 30/0.02 = 1500 steps; maximum number of environment steps allowed in one episode before a forced reset
+        self.max_episode_length: int = math.ceil(env_cfg["episode_length_s"] / self.dt) # 40/0.02 = 1500 steps; maximum number of environment steps allowed in one episode before a forced reset
 
         self.env_cfg: dict = env_cfg
         self.use_terrain = self.env_cfg.get('use_terrain', False)

@@ -98,7 +98,7 @@ def get_cfgs():
         "termination_if_pitch_greater_than": 10,
         # base pose
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
-        "episode_length_s": 30.0,
+        "episode_length_s": 40.0,
         # "resampling_time_s": 4.0, used for resampling commands and domain randomization
         "action_scale": 0.25, # this is smth like the amplitude knob that converts the policy's dimesionless output into real angles
         "simulate_action_latency": True,
@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_uneven.py -e go2-uneven-v2 -B 4096 --max_iterations 500
+python train_uneven.py -e go2-uneven-v3 -B 4096 --max_iterations 500
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000

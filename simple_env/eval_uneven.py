@@ -47,7 +47,7 @@ def main():
             obs, _, rews, dones, infos = env.step(actions)
             n_frames += 1
             if args.record:
-                if n_frames == 1488:
+                if n_frames == 1992:
                     env.stop_recording(f"{args.exp_name}.mp4")
                     exit()
 
