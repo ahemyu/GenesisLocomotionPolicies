@@ -13,9 +13,11 @@ def gs_rand_float(lower, upper, shape, device):
 
 
 class Go2Env:
-    def __init__(self, num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg = None, show_viewer=False, device="cuda"):
+    def __init__(self, num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg = None, show_viewer=False, device="cuda", eval=False):
         self.device = torch.device(device)
         self.show_viewer = show_viewer
+        self.eval = eval
+        self.num_frames = 1001 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
 
         # Configuration parameters
         self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg)
@@ -496,7 +498,7 @@ class Go2Env:
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 241:
+        if self._recording and len(self._recorded_frames) < self.num_frames:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
                 pos=robot_pos + np.array([-1.5, 0.0, 2.2]),  # Position camera behind and above robot
@@ -508,7 +510,7 @@ class Go2Env:
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
         print("We have recorded", len(self._recorded_frames), "frames")
-        if len(self._recorded_frames) == 240:
+        if len(self._recorded_frames) == self.num_frames - 1:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False

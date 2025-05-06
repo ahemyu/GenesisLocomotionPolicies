@@ -144,7 +144,6 @@ def get_cfgs():
             "base_height": -50.0,
             "action_rate": -0.005,
             "similar_to_default": -0.1,
-            # "sideway_movement": -0.25,
         },
     }
     command_cfg = {
@@ -199,7 +198,7 @@ if __name__ == '__main__':
 
 '''
 # training
-python train_walk.py -e go2-walking-v2 --max_iterations 500 
+python train_walk.py -e go2-walking-v3 --max_iterations 500 
 
 # evaluation
 python eval_backflip.py -e EXP_NAME --ckpt NUM_CKPT

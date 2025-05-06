@@ -41,7 +41,7 @@ def get_train_cfg(exp_name, max_iterations):
             "load_run": -1,
             "log_interval": 1,
             "max_iterations": max_iterations,
-            "num_steps_per_env": 32, # how many steps to take in each environment before updating the policy
+            "num_steps_per_env": 24, # how many steps to take in each environment before updating the policy
             "policy_class_name": "ActorCritic",
             "record_interval": 100,
             "resume": False,
@@ -98,17 +98,17 @@ def get_cfgs():
         "termination_if_pitch_greater_than": 10,
         # base pose
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
-        "episode_length_s": 30.0,
-        "resampling_time_s": 4.0,
-        "action_scale": 0.30, # this is smth like the amplitude knob that converts the policy's dimesionless output into real angles
+        "episode_length_s": 20.0,
+        # "resampling_time_s": 4.0, used for resampling commands and domain randomization
+        "action_scale": 0.25, # this is smth like the amplitude knob that converts the policy's dimesionless output into real angles
         "simulate_action_latency": True,
         "clip_actions": 100.0, # self.actions = torch.clip(actions, -clip_actions, clip_actions), so it prevents the actions from going outside the range of -100 to 100 (which is too high)
         'use_terrain': True,
         'terrain_cfg': {
             'subterrain_types': "pyramid_stairs_terrain",
-            'n_subterrains': (3, 1),
+            'n_subterrains': (2, 1),
             'subterrain_size': (12.0, 12.0),
-            'horizontal_scale': 0.25, # determines the number of scales per tile, so here 12/0.25 = 48 per tile so 144 in total (3 tiles)
+            'horizontal_scale': 0.25, # determines the number of scales per tile, so here 12/0.25 = 48 per tile so 96 in total (2 tiles)
             'vertical_scale': 0.005,
         },
         'termination_contact_link_names': ['base'],
@@ -118,8 +118,8 @@ def get_cfgs():
     }
 
     obs_cfg = {
-        "num_obs": 45,
-        "num_priviliged_obs": 75,
+        "num_obs": 48,
+        # "num_priviliged_obs": 75,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -128,28 +128,30 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        "tracking_sigma": 0.40,         # controls how quickly the reward falls off with increasing error
-        "lin_vel_target": 1.5,          # target linear velocity
+        "tracking_sigma": 0.30,
         "reward_scales": {
-            "tracking_lin_vel_x": 1.0,    # Reward for tracking x axis base linear velocity
-            "forward_progress_x": 2.0,        # Reward for forward progress
-            "sideway_movement": -0.5,      # Penalty for sideway movement
-            "lin_vel_y": -1.0,              # Penalty for y axis base linear velocity
-            "lin_vel_z": -0.1,              # Penalty for z axis base linear velocity
-            "action_rate": -0.005,          #  penalty for rapid action changes
-            "collision": -1.0,            # Penalty for collision
-            "foot_clearance": 1.0,         # Reward for foot clearance
-            "yaw_deviation": -0.05,          # Penalty for yaw deviation
+            "tracking_lin_vel_x": 1.0,
+            "tracking_ang_vel": 0.5,
+            "tracking_lin_vel_y": 1.0,
+            "lin_vel_z": -1.0,
+            "action_rate": -0.005,
+            "similar_to_default": -0.1,
         },
     }
-    return env_cfg, obs_cfg, reward_cfg
+    command_cfg = {
+        "num_commands": 3,
+        "lin_vel_x_target": 0.5,
+        "lin_vel_y_target": 0,
+        "ang_vel_target": 0,
+    }
+    return env_cfg, obs_cfg, reward_cfg, command_cfg
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--exp_name", type=str, default="debug")
-    parser.add_argument("-B", "--num_envs", type=int, default=1)
-    parser.add_argument("--max_iterations", type=int, default=1)
+    parser.add_argument("-B", "--num_envs", type=int, default=4096)
+    parser.add_argument("--max_iterations", type=int, default=500)
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument('--ckpt', type=int, default=1000)
     args = parser.parse_args()
@@ -157,7 +159,7 @@ def main():
     gs.init(logging_level="warning")
 
     log_dir = f"logs/{args.exp_name}"
-    env_cfg, obs_cfg, reward_cfg= get_cfgs()
+    env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, args.max_iterations)
 
     if os.path.exists(log_dir):
@@ -169,13 +171,14 @@ def main():
         "obs_cfg": obs_cfg,
         "reward_cfg": reward_cfg,
         "train_cfg": train_cfg,
+        "command_cfg": command_cfg,
         "num_envs": args.num_envs,
     }
     with open(os.path.join(log_dir, "config.json"), "w") as f:
         json.dump(all_cfgs, f, indent=4)
 
     env = WalkUneven(
-        num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg
+        num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg, command_cfg=command_cfg,
     )
 
     runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
@@ -186,9 +189,13 @@ def main():
         print('==> resume training from', resume_path)
         runner.load(resume_path)
 
-# 
     wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
-    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
+    pickle.dump(
+        [env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg],
+        open(f"{log_dir}/cfgs.pkl", "wb"),
+    )
+
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True, curriculum=False)  # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
 
 
 if __name__ == "__main__":
@@ -196,7 +203,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_uneven.py -e go2-uneven-test-2 -B 4096 --max_iterations 1000
+python train_uneven.py -e go2-uneven -B 4096 --max_iterations 500
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000

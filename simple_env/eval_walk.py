@@ -26,6 +26,7 @@ def main():
         reward_cfg=reward_cfg,
         command_cfg=command_cfg,
         show_viewer=False,
+        eval=True
     )
 
     runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
@@ -46,7 +47,7 @@ def main():
             obs, _, rews, dones, infos = env.step(actions)
             n_frames += 1
             if args.record:
-                if n_frames == 600:
+                if n_frames == 1000:
                     env.stop_recording(f"{args.exp_name}.mp4")
                     exit()
 
