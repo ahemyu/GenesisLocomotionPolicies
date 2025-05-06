@@ -131,7 +131,7 @@ def get_cfgs():
         "tracking_sigma": 0.30,
         "reward_scales": {
             "tracking_lin_vel_x": 1.0,
-            "tracking_ang_vel": 0.5,
+            "tracking_ang_vel": 1.0,
             "tracking_lin_vel_y": 1.0,
             "lin_vel_z": -1.0,
             "action_rate": -0.005,
@@ -203,7 +203,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_uneven.py -e go2-uneven-v1 -B 4096 --max_iterations 500
+python train_uneven.py -e go2-uneven-v2 -B 4096 --max_iterations 500
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000
