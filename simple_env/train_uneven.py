@@ -49,6 +49,7 @@ def get_train_cfg(exp_name, max_iterations):
             "run_name": "",
             "runner_class_name": "runner_class_name",
             "save_interval": 200,
+            "init_at_random_ep_len": False,
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1,
@@ -98,7 +99,7 @@ def get_cfgs():
         "termination_if_pitch_greater_than": 10,
         # base pose
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
-        "episode_length_s": 40.0,
+        "episode_length_s": 30.0,
         # "resampling_time_s": 4.0, used for resampling commands and domain randomization
         "action_scale": 0.25, # this is smth like the amplitude knob that converts the policy's dimesionless output into real angles
         "simulate_action_latency": True,
@@ -119,7 +120,7 @@ def get_cfgs():
 
     obs_cfg = {
         "num_obs": 48,
-        # "num_priviliged_obs": 75,
+        "num_priviliged_obs": 72,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -195,15 +196,14 @@ def main():
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
 
-    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True, curriculum=False)  # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
-
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=train_cfg["runner"]["init_at_random_ep_len"], curriculum=True)  # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
 
 if __name__ == "__main__":
     main()
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_uneven.py -e go2-uneven-v3 -B 4096 --max_iterations 500
+python train_uneven.py -e go2-uneven-v3-init-at-random-false -B 4096 --max_iterations 1000
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000

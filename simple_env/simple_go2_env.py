@@ -17,7 +17,7 @@ class Go2Env:
         self.device = torch.device(device)
         self.show_viewer = show_viewer
         self.eval = eval
-        self.num_frames = 1993 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
+        self.num_frames = 1489 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
 
         # Configuration parameters
         self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg)
@@ -395,26 +395,22 @@ class Go2Env:
         # clip_obs = 100.0
         # self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
 
-        if self.num_privileged_obs:
-            self._compute_privileged_observations()
-
-    def _compute_privileged_observations(self):
-        """Compute privileged observations for critic"""
-        self.privileged_obs_buf = torch.cat(
-            [
-                self.base_lin_vel * self.obs_scales['lin_vel'],                     # 3
-                self.base_ang_vel * self.obs_scales['ang_vel'],                     # 3
-                self.projected_gravity,                                             # 3
-                (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'], # 12, current joint angles relative to default
-                self.dof_vel * self.obs_scales['dof_vel'],  # 12, current joint velocities
-                self.last_dof_vel * self.obs_scales['dof_vel'],  # 12, previous joint velocities
-                self.actions, # 12, current actions issued by the policy
-                self.last_actions, # 12, previous actions
-                self.base_pos - self.last_base_pos, # 3, difference between previous and current base position
-            ],
-            axis=-1,
-        )
-        # self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
+        if self.num_privileged_obs is not None:
+            self.privileged_obs_buf = torch.cat(
+                [
+                    self.base_lin_vel * self.obs_scales['lin_vel'],                     # 3
+                    self.base_ang_vel * self.obs_scales['ang_vel'],                     # 3
+                    self.projected_gravity,                                             # 3
+                    (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'], # 12, current joint angles relative to default
+                    self.dof_vel * self.obs_scales['dof_vel'],  # 12, current joint velocities
+                    self.last_dof_vel * self.obs_scales['dof_vel'],  # 12, previous joint velocities
+                    self.actions, # 12, current actions issued by the policy
+                    self.last_actions, # 12, previous actions
+                    self.base_pos - self.last_base_pos, # 3, difference between previous and current base position
+                ],
+                axis=-1,
+            )
+            # self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
     def get_observations(self):
         """Get current observations"""
