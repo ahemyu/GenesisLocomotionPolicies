@@ -87,7 +87,7 @@ class RunOnFlatGround(Go2Env):
     
             dim=1,
         )
-class WalkUneven(Go2Env):
+class WalkPyramidStairs(Go2Env):
 
     def _reward_tracking_lin_vel_x(self):
         # Tracking of linear velocity commands (x axes)

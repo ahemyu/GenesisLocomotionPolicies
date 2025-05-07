@@ -5,7 +5,7 @@ import pickle
 import shutil
 
 import wandb
-from simple_reward_wrapper import WalkUneven
+from simple_reward_wrapper import WalkPyramidStairs
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
 
@@ -178,7 +178,7 @@ def main():
     with open(os.path.join(log_dir, "config.json"), "w") as f:
         json.dump(all_cfgs, f, indent=4)
 
-    env = WalkUneven(
+    env = WalkPyramidStairs(
         num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg, command_cfg=command_cfg,
     )
 

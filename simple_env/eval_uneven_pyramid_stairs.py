@@ -4,7 +4,7 @@ import pickle
 import torch
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
-from simple_reward_wrapper import WalkUneven
+from simple_reward_wrapper import WalkPyramidStairs
 
 def main():
     parser = argparse.ArgumentParser()
@@ -19,7 +19,7 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
     reward_cfg["reward_scales"] = {}
 
-    env = WalkUneven(
+    env = WalkPyramidStairs(
         num_envs=1,
         env_cfg=env_cfg,
         obs_cfg=obs_cfg,
