@@ -45,7 +45,7 @@
             0.0,
             0.0
         ],
-        "episode_length_s": 40.0,
+        "episode_length_s": 30.0,
         "action_scale": 0.25,
         "simulate_action_latency": true,
         "clip_actions": 100.0,
@@ -80,6 +80,7 @@
     },
     "obs_cfg": {
         "num_obs": 48,
+        "num_priviliged_obs": 72,
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -134,7 +135,7 @@
             "experiment_name": "go2-uneven-v3",
             "load_run": -1,
             "log_interval": 1,
-            "max_iterations": 500,
+            "max_iterations": 1000,
             "num_steps_per_env": 24,
             "policy_class_name": "ActorCritic",
             "record_interval": 100,

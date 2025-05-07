@@ -1,7 +1,7 @@
 from simple_go2_env import Go2Env
 import torch 
 
-
+# yaw is from left to right, pitch is from up to down, roll is rotating 
 class WalkFlat(Go2Env):
 
     def _reward_tracking_lin_vel_x(self):
@@ -121,5 +121,5 @@ class WalkUneven(Go2Env):
         # Penalize joint poses far away from default pose
         return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1)
     
-    #TODO: think about penalty for premature termination (only if it didn't reaach the goal)
+    #TODO: think about penalty for premature termination (only if it didn't reach the goal)
     
