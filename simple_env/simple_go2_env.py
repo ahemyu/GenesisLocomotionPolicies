@@ -124,6 +124,7 @@ class Go2Env:
                 vertical_scale=self.terrain_cfg['vertical_scale'],
                 subterrain_size=self.terrain_cfg['subterrain_size'],
                 subterrain_types=self.terrain_cfg['subterrain_types'],
+                
             ),
         )
         
@@ -137,7 +138,8 @@ class Go2Env:
         self.height_field = torch.tensor(
             height_field, device=self.device, dtype=gs.tc_float
         ) * self.terrain_cfg['vertical_scale']
-        self.base_init_pos = torch.tensor([6.0, 6.0, -0.4], device=self.device) # start in the middle of first terrain #TODO: instead of hardcoding, we can sample a random position in the middle of the first terrain
+        y_start = self.terrain_cfg['n_subterrains'][1] * self.terrain_cfg['subterrain_size'][1] / 2
+        self.base_init_pos = torch.tensor([0.3, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, o.35 is approx the height of the robot)
 
     def _add_simple_plane(self):
         """Add simple plane to the scene"""
@@ -481,7 +483,6 @@ class Go2Env:
         self.commands[mask, 0] += delta 
 
 
-    # ------------ Camera and recording functions ----------------
     def _set_camera(self):
         '''Set camera position and direction for recording'''
         self._floating_camera = self.scene.add_camera(
@@ -497,8 +498,8 @@ class Go2Env:
         if self._recording and len(self._recorded_frames) < self.num_frames:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
-                pos=robot_pos + np.array([-1.5, 0.0, 2.2]),  # Position camera behind and above robot
-                lookat=robot_pos + np.array([0.3, 0, 0.1])   # Look slightly ahead of the robot
+                pos=robot_pos + np.array([-1.5, 0.0, 1.0]),  # Position camera behind and above robot
+                lookat=robot_pos + np.array([0.3, 0, 0.0])   # Look slightly ahead of the robot
             )
             frame, _, _, _ = self._floating_camera.render()
             self._recorded_frames.append(frame)
