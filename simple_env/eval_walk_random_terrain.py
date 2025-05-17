@@ -55,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk_random_terrain.py -e go2-fractal-v1 -r --ckpt 500
+python eval_walk_random_terrain.py -e go2-fractal-v2 -r --ckpt 1000
 """
