@@ -407,8 +407,18 @@ class Go2Env:
         # Expand local positions to all environments
         local_positions = self.height_patch_local_positions.unsqueeze(0).repeat(self.num_envs, 1, 1)  # Shape: (num_envs, 25, 3)
 
-        # Rotate local positions to world frame using base_quat
-        rotated_positions = transform_by_quat(local_positions, self.base_quat.unsqueeze(1))  # Shape: (num_envs, 25, 3)
+        # Repeat the quaternion for each point in the patch
+        base_quat_repeated = self.base_quat.unsqueeze(1).repeat(1, 25, 1)  # Shape: (num_envs, 25, 4)
+
+        # Flatten for transform_by_quat
+        base_quat_flat = base_quat_repeated.view(-1, 4)  # Shape: (num_envs * 25, 4) = (102400, 4)
+        local_positions_flat = local_positions.view(-1, 3)  # Shape: (num_envs * 25, 3) = (102400, 3)
+
+        # Rotate local positions to world frame
+        rotated_positions_flat = transform_by_quat(local_positions_flat, base_quat_flat)  # Shape: (num_envs * 25, 3)
+
+        # Reshape back to (num_envs, 25, 3)
+        rotated_positions = rotated_positions_flat.view(self.num_envs, 25, 3)  # Shape: (4096, 25, 3)
 
         # Translate to world coordinates by adding base position
         world_positions = self.base_pos.unsqueeze(1) + rotated_positions  # Shape: (num_envs, 25, 3)
