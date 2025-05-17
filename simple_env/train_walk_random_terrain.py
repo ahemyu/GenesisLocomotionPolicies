@@ -116,7 +116,7 @@ def get_cfgs():
             #     ["pyramid_stairs_terrain"],
             #     ["stairs_terrain"],
             # ],
-            "sloped_terrain",
+            "fractal_terrain",
 
             'n_subterrains': (2, 1),
             'subterrain_size': (12.0, 12.0),
@@ -161,9 +161,9 @@ def get_cfgs():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="debug")
-    parser.add_argument("-B", "--num_envs", type=int, default=4096)
-    parser.add_argument("--max_iterations", type=int, default=500)
+    parser.add_argument("-e", "--exp_name", type=str, default="test")
+    parser.add_argument("-B", "--num_envs", type=int, default=1)
+    parser.add_argument("--max_iterations", type=int, default=5)
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument('--ckpt', type=int, default=1000)
     args = parser.parse_args()
@@ -214,7 +214,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_walk_random_terrain.py -e go2-sloped -B 4096 --max_iterations 500
+python train_walk_random_terrain.py -e go2-fractal-v1 -B 4096 --max_iterations 500
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000

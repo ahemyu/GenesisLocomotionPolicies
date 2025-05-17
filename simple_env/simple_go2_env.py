@@ -138,8 +138,29 @@ class Go2Env:
         self.height_field = torch.tensor(
             height_field, device=self.device, dtype=gs.tc_float
         ) * self.terrain_cfg['vertical_scale']
-        y_start = self.terrain_cfg['n_subterrains'][1] * self.terrain_cfg['subterrain_size'][1] / 2
-        self.base_init_pos = torch.tensor([0.3, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, o.35 is approx the height of the robot)
+        y_start = (self.terrain_cfg['n_subterrains'][1] * self.terrain_cfg['subterrain_size'][1]) / 2
+        self.base_init_pos = torch.tensor([0.3, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, 0.35 is approx the height of the robot)
+
+        self.height_patch_n_x = 5
+        self.height_patch_n_y = 5
+        self.height_patch_step_x = 0.4
+        self.height_patch_step_y = 0.4
+        self.height_patch_n_points = self.height_patch_n_x * self.height_patch_n_y
+
+        local_positions = []
+        for i in range(self.height_patch_n_x):
+            x = i * self.height_patch_step_x
+            for j in range(self.height_patch_n_y):
+                y = -((self.height_patch_n_y - 1) * self.height_patch_step_y) / 2 + j * self.height_patch_step_y
+                local_positions.append([x, y, 0])
+        self.height_patch_local_positions = torch.tensor(
+            local_positions, device=self.device, dtype=gs.tc_float
+        )
+
+        self.num_obs += self.height_patch_n_points
+        if self.num_privileged_obs is not None:
+            self.num_privileged_obs += self.height_patch_n_points
+
 
     def _add_simple_plane(self):
         """Add simple plane to the scene"""
@@ -187,6 +208,7 @@ class Go2Env:
         self.global_gravity = torch.tensor([0.0, 0.0, -1.0], device=self.device, dtype=gs.tc_float).repeat(
             self.num_envs, 1
         )
+        self.relative_heights = torch.zeros((self.num_envs, self.height_patch_n_points), device=self.device, dtype=gs.tc_float) 
         
         # Initialize observation buffers
         self.obs_buf = torch.zeros((self.num_envs, self.num_obs), device=self.device, dtype=gs.tc_float)
@@ -291,6 +313,7 @@ class Go2Env:
         self._update_robot_state()
         self._check_termination()
         self._compute_rewards()
+        self._compute_relative_heights() # compute the height field patch in front of the robot
         self._compute_observations()
         self._render_headless()
 
@@ -378,6 +401,46 @@ class Go2Env:
             self.rew_buf += rew
             self.episode_sums[name] += rew
 
+
+    def _compute_relative_heights(self) -> None:
+        """Compute heights relative to the base of the robot for the height field patch in front of the robot."""
+        # Expand local positions to all environments
+        local_positions = self.height_patch_local_positions.unsqueeze(0).repeat(self.num_envs, 1, 1)  # Shape: (num_envs, 25, 3)
+
+        # Rotate local positions to world frame using base_quat
+        rotated_positions = transform_by_quat(local_positions, self.base_quat.unsqueeze(1))  # Shape: (num_envs, 25, 3)
+
+        # Translate to world coordinates by adding base position
+        world_positions = self.base_pos.unsqueeze(1) + rotated_positions  # Shape: (num_envs, 25, 3)
+
+        # Clamp positions to terrain boundaries (x, y only); #TODO: this seems unnecessary 
+        clipped_positions = world_positions[:, :, :2].clamp(
+            min=torch.zeros(2, device=self.device),
+            max=self.terrain_margin
+        )  # Shape: (num_envs, 25, 2)
+
+        # Convert world positions to height field grid indices
+        grid_indices = (clipped_positions / self.terrain_cfg['horizontal_scale'] - 0.5).floor().int()  # Shape: (num_envs, 25, 2)
+
+        # Get height field dimensions
+        width, height,  = self.height_field.shape
+
+        # Clamp grid indices: x to [0, 95], y to [0, 47]; #TODO: this seems unnecessary
+        grid_indices[:, :, 0] = torch.clamp(grid_indices[:, :, 0], 0, width - 1)  # x-indices from world x
+        grid_indices[:, :, 1] = torch.clamp(grid_indices[:, :, 1], 0, height - 1) # y-indices from world y
+
+        # Extract grid coordinates
+        grid_x = grid_indices[:, :, 0]  # x-indices for rows (world x)
+        grid_y = grid_indices[:, :, 1]  # y-indices for columns (world y)
+
+        # Get terrain heights at these indices
+        heights = self.height_field[grid_x, grid_y]  # Shape: (num_envs, 25)
+
+        # Compute relative heights (terrain height - robot base height)
+        relative_heights = heights - self.base_pos[:, 2].unsqueeze(1)  # Shape: (num_envs, 25)
+
+        self.relative_heights = relative_heights
+
     def _compute_observations(self):
         """Compute observations for agent"""
         self.obs_buf = torch.cat(
@@ -389,13 +452,15 @@ class Go2Env:
                 self.dof_vel * self.obs_scales["dof_vel"],  # 12, current joint velocities 
                 self.actions,  # 12 # current actions issued by the policy
                 self.base_pos - self.last_base_pos,  # 3, difference between previous and current base position 
+                #TODO: add height field patch in front of the robot
+                self.relative_heights,  # 25, height field patch in front of the robot
             ],
             axis=-1,
         )
 
         # clip observations to prevent extreme values
-        # clip_obs = 100.0
-        # self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
+        clip_obs = 100.0
+        self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
 
         if self.num_privileged_obs is not None:
             self.privileged_obs_buf = torch.cat(
@@ -409,10 +474,12 @@ class Go2Env:
                     self.actions, # 12, current actions issued by the policy
                     self.last_actions, # 12, previous actions
                     self.base_pos - self.last_base_pos, # 3, difference between previous and current base position
+                    #TODO: add height field patch in front of the robot
+                    self.relative_heights,  # 25, height field patch in front of the robot
                 ],
                 axis=-1,
             )
-            # self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
+            self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
     def get_observations(self):
         """Get current observations"""
