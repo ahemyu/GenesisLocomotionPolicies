@@ -124,7 +124,7 @@ class Go2Env:
                 vertical_scale=self.terrain_cfg['vertical_scale'],
                 subterrain_size=self.terrain_cfg['subterrain_size'],
                 subterrain_types=self.terrain_cfg['subterrain_types'],
-                
+                randomize=self.terrain_cfg.get('randomize', False),
             ),
         )
         
@@ -369,7 +369,11 @@ class Go2Env:
         self.reset_buf = self.episode_length_buf > self.max_episode_length # if we reached 1500 steps, we need to reset the environment
         self.reset_buf |= torch.abs(self.base_euler[:, 1]) > self.env_cfg["termination_if_pitch_greater_than"]# if pitch(forward/backward tilt) is greater than x degrees, we need to reset the environment
         self.reset_buf |= torch.abs(self.base_euler[:, 0]) > self.env_cfg["termination_if_roll_greater_than"]# if roll(side-to-side tilt) is greater than x degrees, we need to reset the environment
-        
+        base_contact = torch.norm(
+                self.link_contact_forces[:, self.termination_contact_link_indices[0], :], dim=-1
+            ) > 1e-3
+        self.reset_buf |= base_contact # reset if the base is in contact with the ground
+
         if self.use_terrain:
             self._check_terrain_boundaries()
 

@@ -157,6 +157,11 @@ class WalkRandomTerrain(Go2Env):
         # Penalize joint poses far away from default pose
         return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1)
     
+    
+    def _reward_termination(self):
+        non_timeout_reset = (self.reset_buf == 1) & (self.episode_length_buf <= self.max_episode_length)
+        return non_timeout_reset.float()
+    
     #TODO: Add a reward/penalty relating to the terrain height difference to the base height (self.relative_height)
     
     

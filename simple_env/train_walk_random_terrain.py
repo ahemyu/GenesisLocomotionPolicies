@@ -148,6 +148,7 @@ def get_cfgs():
             "lin_vel_z": -1.0,
             "action_rate": -0.005,
             "similar_to_default": -0.1,
+            "termination": -10.0,
         },
     }
     command_cfg = {
@@ -214,7 +215,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_walk_random_terrain.py -e go2-fractal-v2 -B 4096 --max_iterations 1000
+python train_walk_random_terrain.py -e go2-fractal-v2-large-termination -B 4096 --max_iterations 1000
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000
