@@ -118,10 +118,11 @@ def get_cfgs():
             # ],
             "fractal_terrain",
 
-            'n_subterrains': (2, 1),
+            'n_subterrains': (3, 1),
             'subterrain_size': (12.0, 12.0),
             'horizontal_scale': 0.25, # determines the number of scales per tile, so here 12/0.25 = 48 per tile so 96 in total (2 tiles)
             'vertical_scale': 0.005,
+            'randomize': False,
         },
         'termination_contact_link_names': ['base'],
         'penalized_contact_link_names': ['base', 'thigh', 'calf'],
@@ -148,7 +149,7 @@ def get_cfgs():
             "lin_vel_z": -1.0,
             "action_rate": -0.005,
             "similar_to_default": -0.1,
-            "termination": -10.0,
+            # "termination": -10.0,
         },
     }
     command_cfg = {
@@ -208,14 +209,14 @@ def main():
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
 
-    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=train_cfg["runner"]["init_at_random_ep_len"], curriculum=False)  # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=train_cfg["runner"]["init_at_random_ep_len"], curriculum=True)  # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
 
 if __name__ == "__main__":
     main()
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_walk_random_terrain.py -e go2-fractal-v2-large-termination -B 4096 --max_iterations 1000
+python train_walk_random_terrain.py -e go2-fractal-v2-curriculum -B 4096 --max_iterations 1000
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000

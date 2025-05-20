@@ -139,7 +139,12 @@ class Go2Env:
             height_field, device=self.device, dtype=gs.tc_float
         ) * self.terrain_cfg['vertical_scale']
         y_start = (self.terrain_cfg['n_subterrains'][1] * self.terrain_cfg['subterrain_size'][1]) / 2
-        self.base_init_pos = torch.tensor([0.3, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, 0.35 is approx the height of the robot)
+
+        if self.terrain_cfg.get('randomize', False):
+            x_start = (self.terrain_cfg['subterrain_size'][0]) / 2 #start at middle of first terrain 
+            self.base_init_pos = torch.tensor([x_start, y_start, 0.45], device=self.device)
+        else: 
+            self.base_init_pos = torch.tensor([0.3, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, 0.35 is approx the height of the robot)
 
         self.height_patch_n_x = 5
         self.height_patch_n_y = 5
@@ -466,7 +471,6 @@ class Go2Env:
                 self.dof_vel * self.obs_scales["dof_vel"],  # 12, current joint velocities 
                 self.actions,  # 12 # current actions issued by the policy
                 self.base_pos - self.last_base_pos,  # 3, difference between previous and current base position 
-                #TODO: add height field patch in front of the robot
                 self.relative_heights,  # 25, height field patch in front of the robot
             ],
             axis=-1,
@@ -488,7 +492,6 @@ class Go2Env:
                     self.actions, # 12, current actions issued by the policy
                     self.last_actions, # 12, previous actions
                     self.base_pos - self.last_base_pos, # 3, difference between previous and current base position
-                    #TODO: add height field patch in front of the robot
                     self.relative_heights,  # 25, height field patch in front of the robot
                 ],
                 axis=-1,
@@ -560,7 +563,7 @@ class Go2Env:
 
     def increase_x_target(self, delta):
         """Increase the x target velocity by delta"""
-        mask: torch.Tensor = self.commands[:, 0] < 1.0 # mask to select environments where the x target velocity is less than 1.5
+        mask: torch.Tensor = self.commands[:, 0] < 1.5 # mask to select environments where the x target velocity is less than 1.5
         self.commands[mask, 0] += delta 
 
 

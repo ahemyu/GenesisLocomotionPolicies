@@ -159,9 +159,7 @@ class WalkRandomTerrain(Go2Env):
     
     
     def _reward_termination(self):
+        # penalize non timeout termination (falling over, collision)
         non_timeout_reset = (self.reset_buf == 1) & (self.episode_length_buf <= self.max_episode_length)
         return non_timeout_reset.float()
-    
-    #TODO: Add a reward/penalty relating to the terrain height difference to the base height (self.relative_height)
-    
     

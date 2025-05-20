@@ -18,7 +18,7 @@ def main():
     log_dir = f"logs/{args.exp_name}"
     env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
     reward_cfg["reward_scales"] = {}
-
+    env_cfg["terrain_cfg"]["randomize"]=False
     env = WalkRandomTerrain(
         num_envs=1,
         env_cfg=env_cfg,
@@ -47,7 +47,7 @@ def main():
             n_frames += 1
             if args.record:
                 if n_frames == 1500:
-                    env.stop_recording(f"{args.exp_name}.mp4")
+                    env.stop_recording(f"{args.exp_name}_1.mp4")
                     exit()
 
 
@@ -55,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk_random_terrain.py -e go2-fractal-v2-large-termination -r --ckpt 1000
+python eval_walk_random_terrain.py -e go2-fractal-v2-curriculum -r --ckpt 1000
 """
