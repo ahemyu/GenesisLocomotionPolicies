@@ -216,7 +216,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_walk_random_terrain.py -e go2-fractal-v2-curriculum -B 4096 --max_iterations 1000
+python train_walk_random_terrain.py -e go2-fractal-v2-curriculum-long -B 4096 --max_iterations 2000
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000

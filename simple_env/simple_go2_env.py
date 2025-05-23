@@ -454,9 +454,9 @@ class Go2Env:
 
         # Get terrain heights at these indices
         heights = self.height_field[grid_x, grid_y]  # Shape: (num_envs, 25)
-
+ 
         # Compute relative heights (terrain height - robot base height)
-        relative_heights = heights - self.base_pos[:, 2].unsqueeze(1)  # Shape: (num_envs, 25)
+        relative_heights = heights - self.base_pos[:, 2].unsqueeze(1)  # Shape: (num_envs, 25)#
 
         self.relative_heights = relative_heights
 

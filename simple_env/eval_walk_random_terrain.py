@@ -46,7 +46,7 @@ def main():
             obs, _, rews, dones, infos = env.step(actions)
             n_frames += 1
             if args.record:
-                if n_frames == 1500:
+                if n_frames == 50:
                     env.stop_recording(f"{args.exp_name}_1.mp4")
                     exit()
 
@@ -55,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk_random_terrain.py -e go2-fractal-v2-curriculum -r --ckpt 1000
+python eval_walk_random_terrain.py -e go2-fractal-v2-curriculum-long -r --ckpt 2000
 """
