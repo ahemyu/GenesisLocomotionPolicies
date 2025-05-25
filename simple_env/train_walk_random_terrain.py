@@ -116,7 +116,7 @@ def get_cfgs():
             #     ["pyramid_stairs_terrain"],
             #     ["stairs_terrain"],
             # ],
-            "fractal_terrain",
+            "pyramid_stairs_terrain",
 
             'n_subterrains': (3, 1),
             'subterrain_size': (12.0, 12.0),
@@ -209,14 +209,14 @@ def main():
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
 
-    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=train_cfg["runner"]["init_at_random_ep_len"], curriculum=True)  # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=train_cfg["runner"]["init_at_random_ep_len"], curriculum=True, delta=0.1)  # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
 
 if __name__ == "__main__":
     main()
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_walk_random_terrain.py -e go2-fractal-v2-curriculum-long -B 4096 --max_iterations 2000
+python train_walk_random_terrain.py -e go2-pyramid-stairs-height-field -B 4096 --max_iterations 1000
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000

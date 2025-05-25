@@ -92,7 +92,7 @@ class OnPolicyRunner:
 
         _, _ = self.env.reset()
     
-    def learn(self, num_learning_iterations, init_at_random_ep_len=False, curriculum=False):
+    def learn(self, num_learning_iterations, init_at_random_ep_len=False, curriculum=False, delta=0.05):
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf, high=int(self.env.max_episode_length))
         obs = self.env.get_observations()
@@ -150,9 +150,9 @@ class OnPolicyRunner:
             self.tot_timesteps += self.num_steps_per_env * self.env.num_envs
             self.tot_time += collection_time + learn_time
             if curriculum:
-                if it != 0 and it % (tot_iter / 20) == 0:
-                    print("Increasing x target by 0.05")
-                    self.env.increase_x_target(delta=0.05)
+                if it != 0 and it % (tot_iter / 5) == 0:
+                    print(f"Increasing x target by {delta}")
+                    self.env.increase_x_target(delta=delta)
             if self.log_dir is not None and it % self.log_interval == 0:
                 self.log(locals())
             if self.record_video:

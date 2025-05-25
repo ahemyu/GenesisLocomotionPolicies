@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import pickle
 import shutil
@@ -42,9 +43,9 @@ def get_train_cfg(exp_name, max_iterations):
             "load_run": -1,
             "log_interval": 1,
             "max_iterations": max_iterations,
-            "num_steps_per_env": 48, #lenght of trajectories
+            "num_steps_per_env": 24, # how many steps to take in each environment before updating the policy
             "policy_class_name": "ActorCritic",
-            "record_interval": -1,
+            "record_interval": 100,
             "resume": False,
             "resume_path": None,
             "run_name": "",
@@ -105,13 +106,14 @@ def get_cfgs():
         "base_init_pos": [0.0, 0.0, 0.42],
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         "episode_length_s": 30.0,
-        "resampling_time_s": 4.0,
-        "action_scale": 0.15, # controls maximum angular deviation from the default joint positions
+        "action_scale": 0.25, # controls maximum angular deviation from the default joint positions
         "simulate_action_latency": True,
         "clip_actions": 100.0,
+        "use_terrain": False,
     }
     obs_cfg = {
-        "num_obs": 45,
+        "num_obs": 48,
+        "num_priviliged_obs": 72,   
         "obs_scales": {
             "lin_vel": 2.0,
             "ang_vel": 0.25,
@@ -120,22 +122,25 @@ def get_cfgs():
         },
     }
     reward_cfg = {
-        "base_height_target": 0.35,
-        "feet_height_target": 0.1,
+        "tracking_sigma": 0.30,
+        "base_height_target": 0.3,
         "reward_scales": {
-            "lin_vel_z": -0.05,      # Penalty for vertical movement
-            "lin_vel_y": -2.,      # Penalty for lateral movement
-            "lin_vel_x": 3., # Reward for absolute linear velocity
-            "ang_vel_xy": -0.2,     # Penalty for angular velocity in x and y
-            "base_height": -20.0,    # Penalty for incorrect torso height
-            "action_rate": -0.02,   # penalty for rapid action changes
-            "collision": -1.,        # Penalty for collisions of the penalized links (base, thigh, calf)
-            'orientation': -2.0,      # Penalty for non flat base orientation
-            "foot_clearance": 0.5,     # Reward for foot clearance
-            "foot_phase_symmetry": 1.0, # Reward for foot phase symmetry
+            "tracking_lin_vel_x": 1.0,
+            "tracking_ang_vel": 0.5,
+            "tracking_lin_vel_y": 1.0,
+            "lin_vel_z": -1.0,
+            "action_rate": -0.005,
+            "similar_to_default": -0.1,
+            # "termination": -10.0,
         },
     }
-    return env_cfg, obs_cfg, reward_cfg
+    command_cfg = {
+        "num_commands": 3,
+        "lin_vel_x_target": 0.5,
+        "lin_vel_y_target": 0,
+        "ang_vel_target": 0,
+    }
+    return env_cfg, obs_cfg, reward_cfg, command_cfg
 
 
 def main():
@@ -150,15 +155,26 @@ def main():
     gs.init(logging_level="warning")
 
     log_dir = f"logs/{args.exp_name}"
-    env_cfg, obs_cfg, reward_cfg = get_cfgs()
+    env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, args.max_iterations)
 
     if os.path.exists(log_dir):
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
+    all_cfgs = {
+        "env_cfg": env_cfg,
+        "obs_cfg": obs_cfg,
+        "train_cfg": train_cfg,
+        "reward_cfg": reward_cfg,
+        "command_cfg": command_cfg,
+        "num_envs": args.num_envs,
+    }
+    with open(os.path.join(log_dir, "config.json"), "w") as f:
+        json.dump(all_cfgs, f, indent=4)
+
     env = RunOnFlatGround(
-        num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg
+        num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg, command_cfg=command_cfg
     )
 
     runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
@@ -170,17 +186,17 @@ def main():
         runner.load(resume_path)
 
     pickle.dump(
-        [env_cfg, obs_cfg, reward_cfg, train_cfg],
+        [env_cfg, obs_cfg, reward_cfg, train_cfg, command_cfg],
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
     wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
-    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True) #setting init_at_random_ep_len to True will cause each 
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=False, curriculum=False, delta=0) #setting init_at_random_ep_len to True will cause each 
 
 if __name__ == "__main__":
     main()
 
 """
-python train_run.py -e go2-running_without_target_v2 -B 8192 --max_iterations 1000 --resume go2-running_without_target_v2 --ckpt 1000
+python train_run.py -e go2-running-curriculum -B 4096 --max_iterations 1000
 
 resume: 
 python train_run.py -B 8192 --max_iterations 1000 --resume go2-running_without_target_v2 --ckpt 1000
