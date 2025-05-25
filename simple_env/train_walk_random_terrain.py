@@ -116,7 +116,11 @@ def get_cfgs():
             #     ["pyramid_stairs_terrain"],
             #     ["stairs_terrain"],
             # ],
-            "pyramid_stairs_terrain",
+            [
+                ["pyramid_stairs_terrain"],
+                ["fractal_terrain"],                
+                ["flat_terrain"],                
+            ],
 
             'n_subterrains': (3, 1),
             'subterrain_size': (12.0, 12.0),
@@ -216,7 +220,7 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_walk_random_terrain.py -e go2-pyramid-stairs-height-field -B 4096 --max_iterations 1000
+python train_walk_random_terrain.py -e go2-pyramid-and-fractal-curriculum-simple -B 4096 --max_iterations 1000
 
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000

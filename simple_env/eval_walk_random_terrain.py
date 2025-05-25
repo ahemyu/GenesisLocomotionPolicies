@@ -47,7 +47,7 @@ def main():
             n_frames += 1
             if args.record:
                 if n_frames == 1500:
-                    env.stop_recording(f"{args.exp_name}_1.mp4")
+                    env.stop_recording(f"{args.exp_name}.mp4")
                     exit()
 
 
@@ -55,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk_random_terrain.py -e go2-pyramid-stairs-height-field -r --ckpt 1000
+python eval_walk_random_terrain.py -e go2-pyramid-and-fractal-curriculum-simple -r --ckpt 1000
 """
