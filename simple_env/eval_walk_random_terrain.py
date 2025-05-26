@@ -55,5 +55,5 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk_random_terrain.py -e go2-fractal-adaptive-curriculum-big-smaller-threshold -r --ckpt 3600
+python eval_walk_random_terrain.py -e go2-fractal-adaptive-curriculum-big-smaller-threshold-manual-increase -r --ckpt 2000
 """

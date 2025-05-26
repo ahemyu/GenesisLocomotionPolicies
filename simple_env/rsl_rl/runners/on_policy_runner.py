@@ -98,6 +98,7 @@ class OnPolicyRunner:
         self.delta = delta
         self.curriculum_threshold = curriculum_threshold
         self.tracking_reward_buffer = deque(maxlen=20)
+        self.iters_since_last_curriculum_update = 0
 
         _, _ = self.env.reset()
     
@@ -310,6 +311,7 @@ class OnPolicyRunner:
         """Update the curriculum by increasing the x_target if the mean linear velocity x tracking reward over the last 20 iterations is high enough."""
         # Append the current tracking reward to the buffer
         self.tracking_reward_buffer.append(value.item())  # Use .item() to convert tensor to scalar
+        self.iters_since_last_curriculum_update += 1
         
         # For debugging, print the current value and buffer contents
         print(f"Curriculum update check: {value:.2f}, buffer: {list(self.tracking_reward_buffer)}")
@@ -321,7 +323,8 @@ class OnPolicyRunner:
             print(f"Mean tracking reward: {mean_tracking_reward:.2f}")
             
             # If the mean is high enough, increase the target velocity
-            if mean_tracking_reward >= self.curriculum_threshold:
+            if mean_tracking_reward >= self.curriculum_threshold or self.iters_since_last_curriculum_update >= 500:
                 self.env.increase_x_target(self.delta)
                 # Reset the buffer after updating the curriculum
                 self.tracking_reward_buffer.clear()
+                self.iters_since_last_curriculum_update = 0

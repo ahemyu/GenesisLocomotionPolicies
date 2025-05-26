@@ -111,13 +111,13 @@ def get_cfgs():
         'terrain_cfg': {
             'subterrain_types': 
             # [
-            #     ["flat_terrain"],
-            #     ["wave_terrain"],
-            #     ["fractal_terrain"],
-            #     ["sloped_terrain"],
-            #     ["pyramid_sloped_terrain"],
-            #     ["pyramid_stairs_terrain"],
-            #     ["stairs_terrain"],
+                # ["flat_terrain"],
+                # ["wave_terrain"],
+                # ["fractal_terrain"],
+                # ["sloped_terrain"],
+                # ["pyramid_sloped_terrain"],
+                # ["pyramid_stairs_terrain"],
+                # ["stairs_terrain"],
             # ],
             [
                 ["fractal_terrain"],
@@ -225,7 +225,8 @@ if __name__ == "__main__":
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_walk_random_terrain.py -e go2-fractal-adaptive-curriculum-big-smaller-threshold -B 4096 --max_iterations 5000
+python train_walk_random_terrain.py -e go2-fractal-adaptive-curriculum-big-smaller-threshold-manual-increase -B 4096 --max_iterations 4000
+
 python train_walk_random_terrain.py -e tesuto -B 1 --max_iterations 2
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000
