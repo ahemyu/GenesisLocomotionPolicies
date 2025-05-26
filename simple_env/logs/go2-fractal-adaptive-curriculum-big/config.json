@@ -144,7 +144,10 @@
             "run_name": "",
             "runner_class_name": "runner_class_name",
             "save_interval": 200,
-            "init_at_random_ep_len": false
+            "init_at_random_ep_len": false,
+            "curriculum": true,
+            "curriculum_delta": 0.05,
+            "curriculum_threshold": 0.90
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1
