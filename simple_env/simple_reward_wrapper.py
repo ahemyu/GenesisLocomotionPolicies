@@ -156,3 +156,18 @@ class WalkRandomTerrain(Go2Env):
         non_timeout_reset = (self.reset_buf == 1) & (self.episode_length_buf <= self.max_episode_length)
         return non_timeout_reset.float()
     
+    # def _reward_sideway_movement(self):
+    #     # Penalize sideway movement away from the starting point with acceptable delta
+    #     epsilon = 0.2
+    #     max_dev = 6.0 # this is the maximum deviation from initial y possible 
+        
+    #     y_deviation = torch.abs(self.base_pos[:, 1] - self.base_init_pos[1])
+    #     penalized_deviation: torch.Tensor = torch.clamp(
+    #         y_deviation - epsilon, min=0.0
+    #     )
+    #     scaling_denominator: float = max_dev - epsilon 
+    #     scaled_penalty: torch.Tensor = penalized_deviation / scaling_denominator
+    #     final_penalty: torch.Tensor = torch.clamp(
+    #         scaled_penalty, min=0.0, max=1.0
+    #     )
+    #     return final_penalty

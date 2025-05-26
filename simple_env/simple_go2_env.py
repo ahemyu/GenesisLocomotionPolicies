@@ -74,7 +74,6 @@ class Go2Env:
             self.commands[:, 0] = self.command_cfg["lin_vel_x_target"]
             self.commands[:, 1] = self.command_cfg["lin_vel_y_target"]
             self.commands[:, 2] = self.command_cfg["ang_vel_target"]
-    
         # Camera and recording related variables
         self.headless: bool = not self.show_viewer
         self._recording: bool = False
@@ -458,7 +457,6 @@ class Go2Env:
 
         # Get terrain heights at these indices
         heights = self.height_field[grid_x, grid_y]  # Shape: (num_envs, 25)
- 
         # Compute relative heights (terrain height - robot base height)
         relative_heights = heights - self.base_pos[:, 2].unsqueeze(1)  # Shape: (num_envs, 25)#
 
@@ -468,7 +466,7 @@ class Go2Env:
         """Compute observations for agent"""
 
         obs = [ 
-                self.base_lin_vel * self.obs_scales["lin_vel"],  # 3, the robot's linear velocity in its base frame(3d)
+                self.base_lin_vel * self.obs_scales['lin_vel'],                     # 3
                 self.base_ang_vel * self.obs_scales["ang_vel"],  # 3, the robot's angular velocity in its base frame(3d)
                 self.projected_gravity,  # 3, gravity vector in the robot's base frame, indicating its orientation
                 (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 12, current joint angles relative to default
@@ -478,7 +476,6 @@ class Go2Env:
         ]
         if self.use_terrain:
             obs.append(self.relative_heights) # 25, height field patch in front of the robot
-        # Concatenate all observations into a single buffer
         self.obs_buf = torch.cat(obs, axis=-1)  # Shape: (num_envs, num_obs)
 
         # self.obs_buf = torch.cat(

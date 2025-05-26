@@ -201,6 +201,7 @@ class OnPolicyRunner:
                 value = torch.mean(infotensor)
                 if "tracking" in key:
                     wandb_dict['Tracking/' + key] = value
+                    print(f"{key}: {value}")
                 elif key[:4] == "rew_":
                     wandb_dict['Reward/' + key[4:]] = value
                 elif "command" in key:

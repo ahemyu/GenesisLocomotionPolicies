@@ -855,24 +855,6 @@ class LocoEnv:
                     * (max_scale - min_scale) + min_scale
         self.batched_d_gains[env_ids, :] = kd_scales * self.d_gains[None, :]
 
-    # def _draw_debug_vis(self):
-    #     ''' Draws visualizations for dubugging (slows down simulation a lot).
-    #         Default behaviour: draws height measurement points
-    #     '''
-    #     self.scene.clear_debug_objects()
-
-    #     foot_poss = self.foot_positions[0].reshape(-1, 3)
-    #     # self.scene.draw_debug_spheres(poss=foot_poss, radius=0.03, color=(1, 0, 0, 0.7))
-
-    #     foot_poss = foot_poss.cpu()
-    #     self.scene.draw_debug_line(foot_poss[0], foot_poss[3], radius=0.002, color=(1, 0, 0, 0.7))
-    #     self.scene.draw_debug_line(foot_poss[1], foot_poss[2], radius=0.002, color=(1, 0, 0, 0.7))
-
-    #     com = self.com[0]
-    #     # self.scene.draw_debug_sphere(pos=com, radius=0.1, color=(0, 0, 1, 0.7))
-
-    #     com[2] = 0.02 + self.terrain_heights[0]
-    #     self.scene.draw_debug_sphere(pos=com, radius=0.02, color=(0, 0, 1, 0.7))
 
     # ------------ Camera Setup ----------------
     def _set_camera(self):
