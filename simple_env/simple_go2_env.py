@@ -596,9 +596,9 @@ class Go2Env:
 
     def increase_x_target(self, delta):
         """Increase the x target velocity by delta"""
-        mask: torch.Tensor = self.commands[:, 0] < 1.5 # mask to select environments where the x target velocity is less than 1.5
-        self.commands[mask, 0] += delta 
-
+        mask: torch.Tensor = self.commands[:, 0] < 2.5 # mask to select environments where the x target velocity is less than 2.5
+        self.commands[mask, 0] += delta
+        print("Increased x target velocity by", delta)
 
     def _set_camera(self):
         '''Set camera position and direction for recording'''

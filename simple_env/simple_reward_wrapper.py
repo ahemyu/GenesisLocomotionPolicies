@@ -122,24 +122,22 @@ class WalkRandomTerrain(Go2Env):
         # Tracking of linear velocity commands (x axes)
         lin_vel_error = torch.square(self.commands[:, 0] - self.base_lin_vel[:, 0])
         return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
-    
-    
-    def _reward_tracking_lin_vel_y(self):
-        # Tracking of linear velocity commands (y axes)
-        lin_vel_error = torch.square(self.commands[:, 1] - self.base_lin_vel[:, 1])
-        return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
-
+        # track both x and y linear velocities
+        # lin_vel_error = torch.sum(torch.abs(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
+        # return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
 
     def _reward_tracking_ang_vel(self):
         # Tracking of angular velocity commands (yaw)
-        ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
+        ang_vel_error = torch.abs(self.commands[:, 2] - self.base_ang_vel[:, 2])
         return torch.exp(-ang_vel_error / self.reward_cfg["tracking_sigma"])
 
-    
     def _reward_lin_vel_z(self):
         # Penalize z axis base linear velocity
         return torch.square(self.base_lin_vel[:, 2])
 
+    def _reward_lin_vel_y(self):
+        # Penalize y axis base linear velocity
+        return torch.square(self.base_lin_vel[:, 1])
 
     def _reward_action_rate(self):
         # Penalize changes in actions
@@ -156,18 +154,6 @@ class WalkRandomTerrain(Go2Env):
         non_timeout_reset = (self.reset_buf == 1) & (self.episode_length_buf <= self.max_episode_length)
         return non_timeout_reset.float()
     
-    # def _reward_sideway_movement(self):
-    #     # Penalize sideway movement away from the starting point with acceptable delta
-    #     epsilon = 0.2
-    #     max_dev = 6.0 # this is the maximum deviation from initial y possible 
-        
-    #     y_deviation = torch.abs(self.base_pos[:, 1] - self.base_init_pos[1])
-    #     penalized_deviation: torch.Tensor = torch.clamp(
-    #         y_deviation - epsilon, min=0.0
-    #     )
-    #     scaling_denominator: float = max_dev - epsilon 
-    #     scaled_penalty: torch.Tensor = penalized_deviation / scaling_denominator
-    #     final_penalty: torch.Tensor = torch.clamp(
-    #         scaled_penalty, min=0.0, max=1.0
-    #     )
-    #     return final_penalty
+    def _reward_sideway_movement(self):
+        # Penalize sideway movement away from the starting point
+        return torch.clamp(torch.abs(self.base_pos[:, 1] - self.base_init_pos[1]), max=2)

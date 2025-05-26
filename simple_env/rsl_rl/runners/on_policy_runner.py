@@ -48,7 +48,9 @@ class OnPolicyRunner:
                  env: VecEnv,
                  train_cfg,
                  log_dir=None,
-                 device='cpu'):
+                 device='cpu',
+                 curriculum=False,
+                 delta=0.05):
 
         self.cfg=train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
@@ -90,9 +92,14 @@ class OnPolicyRunner:
         self.tot_time = 0
         self.current_learning_iteration = 0
 
+        # curriculum
+        self.curriculum = curriculum
+        self.delta = delta
+        self.tracking_reward_buffer = deque(maxlen=20)
+
         _, _ = self.env.reset()
     
-    def learn(self, num_learning_iterations, init_at_random_ep_len=False, curriculum=False, delta=0.05):
+    def learn(self, num_learning_iterations, init_at_random_ep_len=False):
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf, high=int(self.env.max_episode_length))
         obs = self.env.get_observations()
@@ -146,13 +153,8 @@ class OnPolicyRunner:
             mean_value_loss, mean_surrogate_loss = self.alg.update()
             stop = time.time()
             learn_time = stop - start
-
             self.tot_timesteps += self.num_steps_per_env * self.env.num_envs
             self.tot_time += collection_time + learn_time
-            if curriculum:
-                if it != 0 and it % (tot_iter / 5) == 0:
-                    print(f"Increasing x target by {delta}")
-                    self.env.increase_x_target(delta=delta)
             if self.log_dir is not None and it % self.log_interval == 0:
                 self.log(locals())
             if self.record_video:
@@ -173,7 +175,9 @@ class OnPolicyRunner:
                 if it % (3*self.record_interval) == 0 and self.record_interval > 0:
                     self.start_recording()
             ep_infos.clear()
-        
+            if self.current_learning_iteration == 100:
+                self.env.reward_cfg["tracking_sigma"] = 0.3 # we start with a high sigma to allow the agent to even start walking, then we reduce it such that it learns to actually track the commanded velocity
+       
         self.current_learning_iteration += num_learning_iterations
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
 
@@ -201,7 +205,9 @@ class OnPolicyRunner:
                 value = torch.mean(infotensor)
                 if "tracking" in key:
                     wandb_dict['Tracking/' + key] = value
-                    print(f"{key}: {value}")
+                    if self.curriculum:
+                        if key == "rew_tracking_lin_vel_x":
+                            self.curriculum_update(value)
                 elif key[:4] == "rew_":
                     wandb_dict['Reward/' + key[4:]] = value
                 elif "command" in key:
@@ -297,3 +303,23 @@ class OnPolicyRunner:
         else:
             video_array = np.concatenate([np.expand_dims(frame, axis=0) for frame in frames ], axis=0).swapaxes(1, 3).swapaxes(2, 3)
             wandb.log({"video": wandb.Video(video_array, fps=int(1/self.env.dt))}, step=it)
+
+    def curriculum_update(self, value: torch.Tensor) -> None:
+        """Update the curriculum by increasing the x_target if the mean linear velocity x tracking reward over the last 20 iterations is high enough."""
+        # Append the current tracking reward to the buffer
+        self.tracking_reward_buffer.append(value.item())  # Use .item() to convert tensor to scalar
+        
+        # For debugging, print the current value and buffer contents
+        print(f"Curriculum update check: {value:.2f}, buffer: {list(self.tracking_reward_buffer)}")
+
+        # Check if we have 20 iterations' worth of data
+        if len(self.tracking_reward_buffer) == 20:
+            # Calculate the mean of the last 20 tracking rewards
+            mean_tracking_reward = sum(self.tracking_reward_buffer) / 20
+            print(f"Mean tracking reward: {mean_tracking_reward:.2f}")
+            
+            # If the mean is high enough, increase the target velocity
+            if mean_tracking_reward >= 0.9:
+                self.env.increase_x_target(self.delta)
+                # Reset the buffer after updating the curriculum
+                self.tracking_reward_buffer.clear()
