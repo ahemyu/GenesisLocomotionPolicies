@@ -50,6 +50,9 @@ def get_train_cfg(exp_name, max_iterations):
             "runner_class_name": "runner_class_name",
             "save_interval": 200,
             "init_at_random_ep_len": False,
+            "curriculum": True, # whether to use curriculum learning
+            "curriculum_delta": 0.05, # how much to increase the target linear velocity during curriculum learning
+            "curriculum_threshold": 0.85 # the threshold for the mean of the last 20 tracking rewards to increase the target linear velocity 
         },
         "runner_class_name": "OnPolicyRunner",
         "seed": 1,
@@ -120,9 +123,10 @@ def get_cfgs():
                 ["fractal_terrain"],
                 ["fractal_terrain"],                
                 ["fractal_terrain"],                
+                ["fractal_terrain"],                
             ],
 
-            'n_subterrains': (3, 1),
+            'n_subterrains': (4, 1),
             'subterrain_size': (12.0, 12.0),
             'horizontal_scale': 0.25, # determines the number of scales per tile, so here 12/0.25 = 48 per tile so 96 in total (2 tiles)
             'vertical_scale': 0.005,
@@ -201,8 +205,8 @@ def main():
         num_envs=args.num_envs, env_cfg=env_cfg, obs_cfg=obs_cfg, reward_cfg=reward_cfg, command_cfg=command_cfg,
     )
 
-    runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0", curriculum=True, delta=0.05)
-    
+    runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0", curriculum=train_cfg["runner"]["curriculum"], delta=train_cfg["runner"]["curriculum_delta"], curriculum_threshold=train_cfg["runner"]["curriculum_threshold"])
+
     if args.resume is not None:
         resume_dir = f'logs/{args.resume}'
         resume_path = os.path.join(resume_dir, f'model_{args.ckpt}.pt')
@@ -215,15 +219,14 @@ def main():
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
 
-    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=train_cfg["runner"]["init_at_random_ep_len"])  # if curriculum is True, it will increase x_target by 0.1 every (max_iter/5) iterations
-
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=train_cfg["runner"]["init_at_random_ep_len"])
 if __name__ == "__main__":
     main()
 
 """
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
-python train_walk_random_terrain.py -e go2-fractal-adaptive-curriculum-big -B 4096 --max_iterations 4000
-
+python train_walk_random_terrain.py -e go2-fractal-adaptive-curriculum-big-smaller-threshold -B 4096 --max_iterations 5000
+python train_walk_random_terrain.py -e tesuto -B 1 --max_iterations 2
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000
 """

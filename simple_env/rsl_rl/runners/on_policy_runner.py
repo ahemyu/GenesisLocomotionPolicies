@@ -50,7 +50,8 @@ class OnPolicyRunner:
                  log_dir=None,
                  device='cpu',
                  curriculum=False,
-                 delta=0.05):
+                 delta=0.05,
+                 curriculum_threshold=0.90):
 
         self.cfg=train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
@@ -95,6 +96,7 @@ class OnPolicyRunner:
         # curriculum
         self.curriculum = curriculum
         self.delta = delta
+        self.curriculum_threshold = curriculum_threshold
         self.tracking_reward_buffer = deque(maxlen=20)
 
         _, _ = self.env.reset()
@@ -319,7 +321,7 @@ class OnPolicyRunner:
             print(f"Mean tracking reward: {mean_tracking_reward:.2f}")
             
             # If the mean is high enough, increase the target velocity
-            if mean_tracking_reward >= 0.9:
+            if mean_tracking_reward >= self.curriculum_threshold:
                 self.env.increase_x_target(self.delta)
                 # Reset the buffer after updating the curriculum
                 self.tracking_reward_buffer.clear()
