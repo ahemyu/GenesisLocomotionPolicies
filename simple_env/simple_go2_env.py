@@ -17,7 +17,7 @@ class Go2Env:
         self.device = torch.device(device)
         self.show_viewer = show_viewer
         self.eval = eval
-        self.num_frames = 1489 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
+        self.num_frames = 2497 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
 
         # Configuration parameters
         self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg)
@@ -143,7 +143,7 @@ class Go2Env:
             x_start = (self.terrain_cfg['subterrain_size'][0]) / 2 #start at middle of first terrain 
             self.base_init_pos = torch.tensor([x_start, y_start, 0.45], device=self.device)
         else: 
-            self.base_init_pos = torch.tensor([0.3, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, 0.35 is approx the height of the robot)
+            self.base_init_pos = torch.tensor([0.50, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, 0.35 is approx the height of the robot)
 
         self.height_patch_n_x = 5
         self.height_patch_n_y = 5
@@ -166,6 +166,7 @@ class Go2Env:
             self.num_privileged_obs += self.height_patch_n_points
         
         self.relative_heights = torch.zeros((self.num_envs, self.height_patch_n_points), device=self.device, dtype=gs.tc_float) # init here
+        self.reset_environment_at_random_terrain = self.terrain_cfg.get('reset_environment_at_random_terrain', False)
 
 
     def _add_simple_plane(self):
@@ -561,7 +562,20 @@ class Go2Env:
         )
 
         # reset base
-        self.base_pos[envs_idx] = self.last_base_pos[envs_idx] = self.base_init_pos 
+        if self.reset_environment_at_random_terrain:
+            # Randomly select row indices for each environment to reset
+            row_idx = torch.randint(0, self.terrain_cfg['n_subterrains'][1], (len(envs_idx),), device=self.device)
+            subterrain_size_y = self.terrain_cfg['subterrain_size'][1]
+            y_start = (row_idx + 0.5) * subterrain_size_y  # Center of the selected row
+
+            self.base_pos[envs_idx, 0] = 0.40 # Fixed x position for all environments
+            self.base_pos[envs_idx, 1] = y_start # Random y position based on selected row  
+            self.base_pos[envs_idx, 2] = 0.40  # Fixed height above flat terrain
+            self.last_base_pos[envs_idx] = self.base_pos[envs_idx].clone()
+            # TODO: Do we maybe also need to adjust the base orientation (quat) based on the terrain?
+
+        else:     
+            self.base_pos[envs_idx] = self.last_base_pos[envs_idx] = self.base_init_pos 
         self.base_quat[envs_idx] = self.base_init_quat.reshape(1, -1)
         self.robot.set_pos(self.base_pos[envs_idx], zero_velocity=False, envs_idx=envs_idx)
         self.robot.set_quat(self.base_quat[envs_idx], zero_velocity=False, envs_idx=envs_idx)
@@ -603,7 +617,7 @@ class Go2Env:
     def _set_camera(self):
         '''Set camera position and direction for recording'''
         self._floating_camera = self.scene.add_camera(
-            pos=np.array([-1.5, 0.0, 1.2]),  # Behind and elevated
+            pos=np.array([-1.5, 0.0, 5.0]),  # Behind and elevated
             lookat=np.array([0, 0, 0.1]),    # Looking at the robot
             fov=45,                          # Changed from 40
             GUI=False,
@@ -615,7 +629,7 @@ class Go2Env:
         if self._recording and len(self._recorded_frames) < self.num_frames:
             robot_pos = np.array(self.base_pos[0].cpu())
             self._floating_camera.set_pose(
-                pos=robot_pos + np.array([-1.5, 0.0, 1.0]),  # Position camera behind and above robot
+                pos=robot_pos + np.array([-1.5, 0.0, 5.0]),  # Position camera behind and above robot
                 lookat=robot_pos + np.array([0.3, 0, 0.0])   # Look slightly ahead of the robot
             )
             frame, _, _, _ = self._floating_camera.render()
