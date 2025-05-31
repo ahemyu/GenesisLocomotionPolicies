@@ -19,6 +19,7 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
     reward_cfg["reward_scales"] = {}
     env_cfg["terrain_cfg"]["randomize"]=False
+
     env = WalkRandomTerrain(
         num_envs=1,
         env_cfg=env_cfg,
@@ -47,7 +48,10 @@ def main():
             n_frames += 1
             if args.record:
                 if n_frames == 1500:
-                    env.stop_recording(f"{args.exp_name}_{args.ckpt}.mp4")
+                    env.stop_recording(
+                        f"{args.exp_name}_{args.ckpt}_behind_view.mp4",
+                        f"{args.exp_name}_{args.ckpt}_side_view.mp4"
+                    )
                     exit()
 
 
@@ -55,5 +59,6 @@ if __name__ == "__main__":
     main()
 
 """
-python eval_walk_random_terrain.py -e go2-fractal-adaptive-curriculum-big-smaller-threshold-manual-increase -r --ckpt 2000
+python eval_walk_random_terrain.py -e go2-fractal-adaptive-curriculum-big-smaller-threshold-manual-increase -r --ckpt 2800
+python eval_walk_random_terrain.py -e tesuto -r --ckpt 312
 """

@@ -17,7 +17,7 @@ class Go2Env:
         self.device = torch.device(device)
         self.show_viewer = show_viewer
         self.eval = eval
-        self.num_frames = 2497 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
+        self.num_frames = 3001 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
 
         # Configuration parameters
         self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg)
@@ -77,7 +77,8 @@ class Go2Env:
         # Camera and recording related variables
         self.headless: bool = not self.show_viewer
         self._recording: bool = False
-        self._recorded_frames: list = []
+        self._recorded_frames_behind: list = []
+        self._recorded_frames_side: list = []
 
     def _setup_scene(self, show_viewer):
         """Set up the simulation scene with appropriate options"""
@@ -143,7 +144,7 @@ class Go2Env:
             x_start = (self.terrain_cfg['subterrain_size'][0]) / 2 #start at middle of first terrain 
             self.base_init_pos = torch.tensor([x_start, y_start, 0.45], device=self.device)
         else: 
-            self.base_init_pos = torch.tensor([0.50, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, 0.35 is approx the height of the robot)
+            self.base_init_pos = torch.tensor([0.30, y_start, 0.35], device=self.device) # start at the beginning of the terrain(x starts at 0 but we add small margin, 0.35 is approx the height of the robot)
 
         self.height_patch_n_x = 5
         self.height_patch_n_y = 5
@@ -167,6 +168,7 @@ class Go2Env:
         
         self.relative_heights = torch.zeros((self.num_envs, self.height_patch_n_points), device=self.device, dtype=gs.tc_float) # init here
         self.reset_environment_at_random_terrain = self.terrain_cfg.get('reset_environment_at_random_terrain', False)
+        # self.target_increased: bool = False # flag to indicate if the target has been increased in the curriculum learning
 
 
     def _add_simple_plane(self):
@@ -390,7 +392,7 @@ class Go2Env:
         self._handle_timeouts()
         
         # Reset environments that need resetting
-        self.reset_idx(self.reset_buf.nonzero(as_tuple=False).flatten())# reset the environments that need to be reset
+        self.reset_idx(self.reset_buf.nonzero(as_tuple=False).flatten()) # reset the environments that need to be reset
 
     def _check_terrain_boundaries(self):
         """Check if robot is within terrain boundaries for terrain-based environments"""
@@ -562,7 +564,7 @@ class Go2Env:
         )
 
         # reset base
-        if self.reset_environment_at_random_terrain:
+        if self.reset_environment_at_random_terrain and self.target_increased:
             # Randomly select row indices for each environment to reset
             row_idx = torch.randint(0, self.terrain_cfg['n_subterrains'][1], (len(envs_idx),), device=self.device)
             subterrain_size_y = self.terrain_cfg['subterrain_size'][1]
@@ -612,51 +614,80 @@ class Go2Env:
         """Increase the x target velocity by delta"""
         mask: torch.Tensor = self.commands[:, 0] < 2.5 # mask to select environments where the x target velocity is less than 2.5
         self.commands[mask, 0] += delta
+        # self.target_increased = True # set the flag to indicate that the target has been increased
         print("Increased x target velocity by", delta)
 
     def _set_camera(self):
-        '''Set camera position and direction for recording'''
-        self._floating_camera = self.scene.add_camera(
+        '''Set camera positions and directions for recording'''
+        # Elevated behind view (original)
+        self._floating_camera_behind = self.scene.add_camera(
             pos=np.array([-1.5, 0.0, 5.0]),  # Behind and elevated
             lookat=np.array([0, 0, 0.1]),    # Looking at the robot
-            fov=45,                          # Changed from 40
+            fov=45,                          
             GUI=False,
-            res=(720, 720),               # Resolution of the camera
+            res=(720, 720),               
+        )
+        
+        # Side view for feet
+        self._floating_camera_side = self.scene.add_camera(
+            pos=np.array([0.0, -2.5, 1.5]),     # Side view: to the right and lower
+            lookat=np.array([0, 0, 0.3]),       # Looking at robot's center/legs
+            fov=45,                              
+            GUI=False,
+            res=(720, 720),                      
         )
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < self.num_frames:
+        if self._recording and len(self._recorded_frames_behind) < self.num_frames:
             robot_pos = np.array(self.base_pos[0].cpu())
-            self._floating_camera.set_pose(
-                pos=robot_pos + np.array([-1.5, 0.0, 5.0]),  # Position camera behind and above robot
+            
+            # Behind camera
+            self._floating_camera_behind.set_pose(
+                pos=robot_pos + np.array([-1.5, 0.0, 2.5]),  # Position camera behind and above robot
                 lookat=robot_pos + np.array([0.3, 0, 0.0])   # Look slightly ahead of the robot
             )
-            frame, _, _, _ = self._floating_camera.render()
-            self._recorded_frames.append(frame)
+            frame_behind, _, _, _ = self._floating_camera_behind.render()
+            self._recorded_frames_behind.append(frame_behind)
+            
+            # Side camera
+            self._floating_camera_side.set_pose(
+                pos=robot_pos + np.array([0.0, -2.5, 1.0]),  # Side view following robot
+                lookat=robot_pos + np.array([0.0, 0, -0.1])  # Look at robot's feet level
+            )
+            frame_side, _, _, _ = self._floating_camera_side.render()
+            self._recorded_frames_side.append(frame_side)
 
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
-        print("We have recorded", len(self._recorded_frames), "frames")
-        if len(self._recorded_frames) == self.num_frames - 1:
-            frames = self._recorded_frames
-            self._recorded_frames = []
+        print("We have recorded", len(self._recorded_frames_behind), "behind frames")
+        print("We have recorded", len(self._recorded_frames_side), "side frames")
+        if len(self._recorded_frames_behind) == self.num_frames - 1:
+            frames_behind = self._recorded_frames_behind
+            frames_side = self._recorded_frames_side
+            self._recorded_frames_behind = []
+            self._recorded_frames_side = []
             self._recording = False
-            return frames
+            return frames_behind, frames_side
         else:
-            return None
+            return None, None
 
     def start_recording(self, record_internal=True):
         '''Start recording frames'''
-        self._recorded_frames = []
+        self._recorded_frames_behind = []
+        self._recorded_frames_side = []
         self._recording = True
         if not record_internal:
-            self._floating_camera.start_recording()
+            self._floating_camera_behind.start_recording()
+            self._floating_camera_side.start_recording()
 
-    def stop_recording(self, save_path=None):
-        '''Stop recording and optionally save to a file'''
-        self._recorded_frames = []
+    def stop_recording(self, save_path_behind=None, save_path_side=None):
+        '''Stop recording and optionally save to files'''
+        self._recorded_frames_behind = []
+        self._recorded_frames_side = []
         self._recording = False
-        if save_path is not None:
+        if save_path_behind is not None:
             print("fps", int(1 / self.dt))
-            self._floating_camera.stop_recording(save_path, fps=int(1 / self.dt))
+            self._floating_camera_behind.stop_recording(save_path_behind, fps=int(1 / self.dt))
+        if save_path_side is not None:
+            self._floating_camera_side.stop_recording(save_path_side, fps=int(1 / self.dt))
