@@ -14,23 +14,22 @@ import random
 def create_random_terrains(seed: int = 42):
     """Create a 5x5 terrain configuration with reproducible randomization."""
     random.seed(seed)
-    subterrain_types = [["flat_terrain", "flat_terrain", "flat_terrain", "flat_terrain", "flat_terrain"]] # first row is always flat terrain 
+    terrain = [["fractal_terrain", "fractal_terrain", "fractal_terrain"]]
 
     all_terrains = [
         "wave_terrain",
-        "fractal_terrain", 
+        # "fractal_terrain",
         "pyramid_sloped_terrain",
         "pyramid_stairs_terrain",
         "flat_terrain"
     ]
     
-    for _ in range(4):  # 4 more rows after the first flat terrain row
-        
+    for _ in range(2):
         shuffled_terrains = all_terrains.copy()
         random.shuffle(shuffled_terrains)
-        subterrain_types.append(shuffled_terrains)
+        terrain.append(shuffled_terrains[:3]) # take the first 3 terrains from the shuffled list
 
-    return subterrain_types
+    return terrain
 
 def get_train_cfg(exp_name, max_iterations):
 
@@ -121,18 +120,18 @@ def get_cfgs():
         "kd": 1.0, #  derivative gain that multiplies the time-derivative of the position error (angular velocity error) to generate a damping torque opposing motion
         # termination
         "termination_if_roll_greater_than": 20,  # degree
-        "termination_if_pitch_greater_than": 10,
+        "termination_if_pitch_greater_than": 30,  # degree
         # base pose
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
-        "episode_length_s": 50.0,
+        "episode_length_s": 30.0,
         # "resampling_time_s": 4.0, used for resampling commands and domain randomization
         "action_scale": 0.25, # this is smth like the amplitude knob that converts the policy's dimesionless output into real angles
         "simulate_action_latency": True,
         "clip_actions": 100.0, # self.actions = torch.clip(actions, -clip_actions, clip_actions), so it prevents the actions from going outside the range of -100 to 100 (which is too high)
         'use_terrain': True,
         'terrain_cfg': {
-            'subterrain_types': 'fractal_terrain',# create_random_terrains(),  # 5x5 grid of random subterrain types that each start with flat terrain
-            'n_subterrains': (1, 1),
+            'subterrain_types': 'fractal_terrain', #create_random_terrains(), # create_random_terrains(),  # 5x5 grid of random subterrain types that each start with flat terrain
+            'n_subterrains': (3, 1),
             'subterrain_size': (12.0, 12.0),
             'horizontal_scale': 0.25, # determines the number of scales per tile, so here 12/0.25 = 48 per tile
             'vertical_scale': 0.005,
@@ -159,18 +158,19 @@ def get_cfgs():
         "tracking_sigma": 0.30, 
         "reward_scales": {
             "tracking_lin_vel_x": 1.0,
-            "tracking_ang_vel": 0.5,
+            "tracking_ang_vel": 1.0,
             "lin_vel_z": -1.0,
             "lin_vel_y": -5.0,
             "action_rate": -0.005,
             "similar_to_default": -0.1, # TODO: Maybe remove this as for high speeds the joint angles will be very different from the default angles
-            # "termination": -10.0, 1
+            # "termination": -10.0
             "sideway_movement": -1.0,
+            # "x_progress": 1.0, # reward for moving forward in the x direction
         },
     }
     command_cfg = {
         "num_commands": 3,
-        "lin_vel_x_target": 0.4,
+        "lin_vel_x_target": 0.6,
         "lin_vel_y_target": 0.0,
         "ang_vel_target": 0.0,
     }
@@ -233,7 +233,7 @@ if __name__ == "__main__":
 To only see one of the GPUs: export CUDA_VISIBLE_DEVICES=1 (or 0)
 python train_walk_random_terrain.py -e go2-all-terrains-v0 -B 4096 --max_iterations 2000
 
-python train_walk_random_terrain.py -e tesuto -B 1 --max_iterations 100
+python train_walk_random_terrain.py -e test -B 4096 --max_iterations 312
 resume : 
 python train_uneven.py -e go2-uneven-v4-resume -B 4096 --max_iterations 1000 --resume go2-uneven-v4 --ckpt 1000
 """

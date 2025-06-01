@@ -17,7 +17,7 @@ class Go2Env:
         self.device = torch.device(device)
         self.show_viewer = show_viewer
         self.eval = eval
-        self.num_frames = 3001 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
+        self.num_frames = 1489 if self.eval else 241 #save shorter clips during training and longer clips during evaluation
 
         # Configuration parameters
         self._initialize_env_parameters(num_envs, env_cfg, obs_cfg, reward_cfg, command_cfg)
@@ -338,7 +338,7 @@ class Go2Env:
         self.actions = torch.clip(actions, -self.env_cfg["clip_actions"], self.env_cfg["clip_actions"]) #clippimng to prevent extreme values
         exec_actions = self.last_actions if self.simulate_action_latency else self.actions  #simulate action latency
         target_dof_pos = exec_actions * self.env_cfg["action_scale"] + self.default_dof_pos # transform normalized policy actions into target joint positions
-        self.robot.control_dofs_position(target_dof_pos, self.motor_dofs)# send target positions to robot's PD controllers
+        self.robot.control_dofs_position(target_dof_pos, self.motor_dofs)# send target positions to robot's PID controllers
         self.scene.step() # advance the simulation by one step
 
     def _update_robot_state(self):
@@ -410,6 +410,7 @@ class Go2Env:
 
     def _compute_rewards(self):
         """Compute rewards for all environments"""
+        # TODO: think about introducing a curriculum penalty coefficient that increases the difficulty of the task over time(starts low)
         self.rew_buf[:] = 0.0
         for name, reward_func in self.reward_functions.items():
             rew = reward_func() * self.reward_scales[name]
@@ -629,13 +630,14 @@ class Go2Env:
         )
         
         # Side view for feet
-        self._floating_camera_side = self.scene.add_camera(
-            pos=np.array([0.0, -2.5, 1.5]),     # Side view: to the right and lower
-            lookat=np.array([0, 0, 0.3]),       # Looking at robot's center/legs
-            fov=45,                              
-            GUI=False,
-            res=(720, 720),                      
-        )
+        if self.eval:
+            self._floating_camera_side = self.scene.add_camera(
+                pos=np.array([0.0, -2.5, 1.5]),     # Side view: to the right and lower
+                lookat=np.array([0, 0, 0.3]),       # Looking at robot's center/legs
+                fov=45,                              
+                GUI=False,
+                res=(720, 720),                      
+            )
 
     def _render_headless(self):
         '''Render frames for recording when in headless mode'''
@@ -651,26 +653,29 @@ class Go2Env:
             self._recorded_frames_behind.append(frame_behind)
             
             # Side camera
-            self._floating_camera_side.set_pose(
-                pos=robot_pos + np.array([0.0, -2.5, 1.0]),  # Side view following robot
-                lookat=robot_pos + np.array([0.0, 0, -0.1])  # Look at robot's feet level
-            )
-            frame_side, _, _, _ = self._floating_camera_side.render()
-            self._recorded_frames_side.append(frame_side)
+            if self.eval:
+                self._floating_camera_side.set_pose(
+                    pos=robot_pos + np.array([0.0, -2.5, 1.0]),  # Side view following robot
+                    lookat=robot_pos + np.array([0.0, 0, -0.1])  # Look at robot's feet level
+                )
+                frame_side, _, _, _ = self._floating_camera_side.render()
+                self._recorded_frames_side.append(frame_side)
 
     def get_recorded_frames(self):
         '''Return the recorded frames and reset recording state'''
         print("We have recorded", len(self._recorded_frames_behind), "behind frames")
-        print("We have recorded", len(self._recorded_frames_side), "side frames")
-        if len(self._recorded_frames_behind) == self.num_frames - 1:
+        if len(self._recorded_frames_behind) == self.num_frames - 1 and self.eval:
             frames_behind = self._recorded_frames_behind
             frames_side = self._recorded_frames_side
             self._recorded_frames_behind = []
             self._recorded_frames_side = []
             self._recording = False
             return frames_behind, frames_side
-        else:
-            return None, None
+        elif len(self._recorded_frames_behind) == self.num_frames - 1 and not self.eval:
+            frames_behind = self._recorded_frames_behind
+            self._recorded_frames_behind = []
+            self._recording = False
+            return frames_behind
 
     def start_recording(self, record_internal=True):
         '''Start recording frames'''
@@ -679,7 +684,8 @@ class Go2Env:
         self._recording = True
         if not record_internal:
             self._floating_camera_behind.start_recording()
-            self._floating_camera_side.start_recording()
+            if self.eval:
+                self._floating_camera_side.start_recording()
 
     def stop_recording(self, save_path_behind=None, save_path_side=None):
         '''Stop recording and optionally save to files'''
@@ -689,5 +695,5 @@ class Go2Env:
         if save_path_behind is not None:
             print("fps", int(1 / self.dt))
             self._floating_camera_behind.stop_recording(save_path_behind, fps=int(1 / self.dt))
-        if save_path_side is not None:
+        if save_path_side is not None and self.eval:
             self._floating_camera_side.stop_recording(save_path_side, fps=int(1 / self.dt))

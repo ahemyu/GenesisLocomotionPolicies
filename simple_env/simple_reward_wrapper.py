@@ -152,3 +152,7 @@ class WalkRandomTerrain(Go2Env):
     def _reward_sideway_movement(self):
         # Penalize sideway movement away from the starting point
         return torch.clamp(torch.abs(self.base_pos[:, 1] - self.base_init_pos[1]), max=2)
+    
+    def _reward_x_progress(self):
+        # Reward for moving forward (to prevent model from standing still)
+        return torch.clamp(self.base_pos[:, 0] - self.base_init_pos[0], max=1)
