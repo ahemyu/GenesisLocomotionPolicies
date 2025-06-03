@@ -2,8 +2,11 @@ import argparse
 import os
 import pickle
 import shutil
-from complicated_env.reward_wrapper import Backflip
+
+import wandb
+from reward_wrapper import Backflip
 from rsl_rl.runners import OnPolicyRunner
+
 import genesis as gs
 
 
@@ -187,7 +190,6 @@ def main():
     parser.add_argument('-B', '--num_envs', type=int, default=10000)
     parser.add_argument('--max_iterations', type=int, default=1000)
     parser.add_argument('--resume', type=str, default=None)
-    parser.add_argument('-o', '--offline', action='store_true', default=False)
 
     parser.add_argument('--eval', action='store_true', default=False)
     parser.add_argument('--debug', action='store_true', default=False)
@@ -230,7 +232,7 @@ def main():
         print('==> resume training from', resume_path)
         runner.load(resume_path)
 
-    # wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='offline' if args.offline else 'online')
+    wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
 
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, command_cfg],
@@ -246,13 +248,7 @@ if __name__ == '__main__':
 
 '''
 # training
-python train_backflip.py -e backflip -B 2000 --max-iterations 2000
-
-# resume training from last run
-python train_backflip.py -e backflip_v2 --resume backflip --ckpt 1000 -B 1000 
-
-# also resume training from this run 
-python train_backflip.py -e backflip_v3 --resume backflip_v2 --ckpt 2000 -B 2000
+python train_backflip.py -e EXP_NAME
 
 # evaluation
 python eval_backflip.py -e EXP_NAME --ckpt NUM_CKPT

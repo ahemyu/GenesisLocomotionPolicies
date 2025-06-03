@@ -112,8 +112,6 @@ class LocoEnv:
             self.height_field = torch.tensor(
                 height_field, device=self.device, dtype=gs.tc_float
             ) * self.terrain_cfg['vertical_scale']
-
-            # TODO: adjust base_init_pos based on terrain height
         else:
             self.scene.add_entity(
             gs.morphs.URDF(file='urdf/plane/plane.urdf', fixed=True),
@@ -136,8 +134,8 @@ class LocoEnv:
             visualize_contact=self.debug,
         )
 
-        self._set_camera()
 
+        self._set_camera()
         # build
         self.scene.build(n_envs=num_envs)
 
@@ -489,7 +487,7 @@ class LocoEnv:
                 self.base_pos[:, 0] < 1,
                 self.base_pos[:, 1] < 1,
             )
-        self.reset_buf |= self.base_pos[:, 2] < self.env_cfg['termination_if_height_lower_than'] # TODO; remove this for terrain 
+        self.reset_buf |= self.base_pos[:, 2] < self.env_cfg['termination_if_height_lower_than']
         self.reset_buf |= self.time_out_buf
 
     def compute_reward(self):
@@ -608,7 +606,6 @@ class LocoEnv:
         self.obs_noise[33:45] = self.obs_cfg['obs_noise']['dof_vel']
 
     def _resample_commands(self, envs_idx):
-        # TODO: remove this 
         # resample commands
 
         # lin_vel
@@ -856,35 +853,30 @@ class LocoEnv:
         self.batched_d_gains[env_ids, :] = kd_scales * self.d_gains[None, :]
 
 
-    # ------------ Camera Setup ----------------
     def _set_camera(self):
-        '''Set camera position and direction for recording'''
+        ''' Set camera position and direction
+        '''
         self._floating_camera = self.scene.add_camera(
-            pos=np.array([-1.5, 0.0, 1.2]),  # Behind and elevated
-            lookat=np.array([0, 0, 0.1]),    # Looking at the robot
-            fov=45,                          # Changed from 40
+            pos=np.array([0, -1, 1]),
+            lookat=np.array([0, 0, 0]),
+            res=(720, 720),
+            fov=40,
             GUI=False,
-            res=(720, 720),               # Resolution of the camera
         )
+
         self._recording = False
         self._recorded_frames = []
 
-
     def _render_headless(self):
-        '''Render frames for recording when in headless mode'''
-        if self._recording and len(self._recorded_frames) < 1009:
+        if self._recording and len(self._recorded_frames) < 150:
             robot_pos = np.array(self.base_pos[0].cpu())
-            self._floating_camera.set_pose(
-                pos=robot_pos + np.array([-1.5, 0.0, 2.2]),  # Position camera behind and above robot
-                lookat=robot_pos + np.array([0.3, 0, 0.1])   # Look slightly ahead of the robot
-            )
+            self._floating_camera.set_pose(pos=robot_pos + np.array([-1, -1, 0.5]), lookat=robot_pos + np.array([0, 0, -0.1]))
             frame, _, _, _ = self._floating_camera.render()
             self._recorded_frames.append(frame)
 
+
     def get_recorded_frames(self):
-        '''Return the recorded frames and reset recording state'''
-        print("We have recorded", len(self._recorded_frames), "frames")
-        if len(self._recorded_frames) == 1008:
+        if len(self._recorded_frames) == 150:
             frames = self._recorded_frames
             self._recorded_frames = []
             self._recording = False
@@ -893,16 +885,16 @@ class LocoEnv:
             return None
 
     def start_recording(self, record_internal=True):
-        '''Start recording frames'''
         self._recorded_frames = []
         self._recording = True
-        if not record_internal:
+        if record_internal:
+            self._record_frames = True
+        else:
             self._floating_camera.start_recording()
 
     def stop_recording(self, save_path=None):
-        '''Stop recording and optionally save to a file'''
         self._recorded_frames = []
         self._recording = False
         if save_path is not None:
             print("fps", int(1 / self.dt))
-            self._floating_camera.stop_recording(save_path, fps=int(1 / self.dt))
+            self._floating_camera.stop_recording(save_path, fps = int(1 / self.dt))

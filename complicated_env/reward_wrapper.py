@@ -1,37 +1,101 @@
+import numpy as np
 import torch
+
+import genesis as gs
 from locomotion_env import *
-# yaw is from left to right, pitch is from up to down, roll is rotating 
+
 class Go2(LocoEnv):
     
     def _reward_tracking_lin_vel(self):
         # Tracking of linear velocity commands (xy axes)
-        lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
-        return torch.exp(-lin_vel_error / self.reward_cfg["tracking_sigma"])
+        lin_vel_error = torch.sum(
+            torch.square(
+                self.commands[:, :2] - self.base_lin_vel[:, :2]
+            ),
+            dim=1,
+        )
+        return torch.exp(-lin_vel_error / self.reward_cfg['tracking_sigma'])
 
     def _reward_tracking_ang_vel(self):
         # Tracking of angular velocity commands (yaw)
-        ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
-        return torch.exp(-ang_vel_error / self.reward_cfg["tracking_sigma"])
+        ang_vel_error = torch.square(
+            self.commands[:, 2] - self.base_ang_vel[:, 2]
+        )
+        return torch.exp(-ang_vel_error / self.reward_cfg['tracking_sigma'])
 
     def _reward_lin_vel_z(self):
         # Penalize z axis base linear velocity
         return torch.square(self.base_lin_vel[:, 2])
 
+    def _reward_ang_vel_xy(self):
+        # Penalize xy axes base angular velocity
+        return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
+
+    def _reward_orientation(self):
+        # Penalize non flat base orientation
+        return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
+
+    def _reward_torques(self):
+        # Penalize torques
+        return torch.sum(torch.square(self.torques), dim=1)
+
+    def _reward_dof_vel(self):
+        # Penalize dof velocities
+        return torch.sum(torch.square(self.dof_vel), dim=1)
+
+    def _reward_dof_acc(self):
+        # Penalize dof accelerations
+        return torch.sum(
+            torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1
+        )
+
     def _reward_action_rate(self):
         # Penalize changes in actions
         return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
 
-    def _reward_similar_to_default(self):
-        # Penalize joint poses far away from default pose
-        return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1)
-
     def _reward_base_height(self):
         # Penalize base height away from target
-        return torch.square(self.base_pos[:, 2] - self.reward_cfg["base_height_target"])
+        base_height = self.base_pos[:, 2]
+        base_height_target = self.reward_cfg['base_height_target']
+        return torch.square(base_height - base_height_target)
+
+    def _reward_collision(self):
+        # Penalize collisions on selected bodies
+        return torch.sum(
+            1.0
+            * (
+                torch.norm(
+                    self.link_contact_forces[:, self.penalized_contact_link_indices, :],
+                    dim=-1,
+                )
+                > 0.1
+            ),
+            dim=1,
+        )
+
+    def _reward_termination(self):
+        # Terminal reward / penalty
+        return self.reset_buf * ~self.time_out_buf
+
+    def _reward_dof_pos_limits(self):
+        # Penalize dof positions too close to the limit
+        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.0)  # lower limit
+        out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.0)  # upper limit
+        return torch.sum(out_of_limits, dim=1)
+
+    def _reward_feet_air_time(self):
+        # Reward long steps
+        contact = self.link_contact_forces[:, self.feet_link_indices, 2] > 1.
+        contact_filt = torch.logical_or(contact, self.last_contacts) 
+        self.last_contacts = contact
+        first_contact = (self.feet_air_time > 0.) * contact_filt
+        self.feet_air_time += self.dt
+        rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1) # reward only on first contact with the ground
+        rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1 #no reward for zero command
+        self.feet_air_time *= ~contact_filt
+        return rew_airTime
     
-# These are the different tasks that the go2 robot learned to perform 
 class Backflip(Go2):
-    """Perform a backflip on flat ground."""
 
     def reset_idx(self, envs_idx):
         if len(envs_idx) == 0:
@@ -168,7 +232,7 @@ class Backflip(Go2):
     
     def _reward_ang_vel_y(self):
         current_time = self.episode_length_buf * self.dt
-        ang_vel = -self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2) #negative because backflip
+        ang_vel = -self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2)
         return ang_vel * torch.logical_and(current_time > 0.5, current_time < 1.0)
 
     def _reward_ang_vel_z(self):

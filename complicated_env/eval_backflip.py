@@ -1,16 +1,17 @@
 import argparse
 import os
 import pickle
+
 import torch
-from complicated_env.reward_wrapper import Backflip
+from reward_wrapper import Backflip
 from rsl_rl.runners import OnPolicyRunner
+from train_backflip import get_train_cfg
 
 import genesis as gs
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--exp_name', type=str, default='backflip')
-    parser.add_argument('-v', '--vis', action='store_true', default=True)
     parser.add_argument('-c', '--cpu', action='store_true', default=False)
     parser.add_argument('-r', '--record', action='store_true', default=False)
     parser.add_argument('--ckpt', type=int, default=1000)
@@ -37,7 +38,6 @@ def main():
     log_dir = f'logs/{args.exp_name}'
 
     args.max_iterations = 1
-    from complicated_env.train_backflip import get_train_cfg
     runner = OnPolicyRunner(env, get_train_cfg(args), log_dir, device='cuda:0')
 
     resume_path = os.path.join(log_dir, f'model_{args.ckpt}.pt')
@@ -62,9 +62,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-"""
-# Evaluation command
-python eval_backflip.py -e backflip_worked --ckpt 1000 --record  
-"""
