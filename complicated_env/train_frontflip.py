@@ -5,7 +5,7 @@ import shutil
 from reward_wrapper import FrontFlip
 from rsl_rl.runners import OnPolicyRunner
 import genesis as gs
-
+import wandb
 
 def get_train_cfg(args):
 
@@ -157,16 +157,16 @@ def get_cfgs():
     reward_cfg = {
     'soft_dof_pos_limit': 0.9,
         'reward_scales': {
-            'ang_vel_y': 10.0, # higher than in backflip
+            'ang_vel_y': 7.0, # higher than in backflip
             'ang_vel_z': -1.0,              
-            'lin_vel_z': 20.0,
+            'lin_vel_z': 30.0,
             'orientation_control': -1.0,
             'feet_height_before_frontflip': -30.0,
-            'height_control': -10.0,
+            'height_control': -15.0,
             'actions_symmetry': -0.1,
             'gravity_y': -10.0,           
             'feet_distance': -1.0,
-            'action_rate': -0.001,
+            'action_rate': -0.01,
             'collision': -10.0, # to prevent landing on base
         },
 }
@@ -182,7 +182,7 @@ def get_cfgs():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-e', '--exp_name', type=str, default='frontflip')
+    parser.add_argument('-e', '--exp_name', type=str, default='frontflip_test_2')
     parser.add_argument('-v', '--vis', action='store_true', default=False)
     parser.add_argument('-c', '--cpu', action='store_true', default=False)
     parser.add_argument('-B', '--num_envs', type=int, default=10000)
@@ -236,7 +236,7 @@ def main():
         [env_cfg, obs_cfg, reward_cfg, command_cfg],
         open(f'{log_dir}/cfgs.pkl', 'wb'),
     )
-
+    wandb.init(project='genesis', name=args.exp_name, dir=log_dir, mode='online')
     runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
 
 

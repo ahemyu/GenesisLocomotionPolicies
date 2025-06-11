@@ -404,7 +404,7 @@ class FrontFlip(Go2):
         and return to the initial upright orientation, ensuring a controlled flip and stable landing preparation."""
         current_time = self.episode_length_buf * self.dt
         phase = (current_time - 0.5).clamp(min=0, max=0.5)
-        quat_pitch = gs_quat_from_angle_axis(4 * phase * torch.pi,
+        quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi, #TODO; test if reverting this changes anything
                                              torch.tensor([0, 1, 0], device=self.device, dtype=torch.float))
 
         desired_base_quat = gs_quat_mul(quat_pitch, self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1))
@@ -421,7 +421,7 @@ class FrontFlip(Go2):
         Promotes the rotational motion necessary for the frontflip by rewarding positive y-axis angular velocity,
         capped to prevent excessive spinning."""
         current_time = self.episode_length_buf * self.dt
-        ang_vel = self.base_ang_vel[:, 1].clamp(max=7.2, min=-7.2) #positive because frontflip
+        ang_vel = self.base_ang_vel[:, 1].clamp(max=10.0, min=-10.0) #positive because frontflip
         return ang_vel * torch.logical_and(current_time > 0.5, current_time < 1.0)
 
     def _reward_ang_vel_z(self):
