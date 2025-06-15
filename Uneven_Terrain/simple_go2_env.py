@@ -482,19 +482,6 @@ class Go2Env:
             obs.append(self.relative_heights) # 25, height field patch in front of the robot
         self.obs_buf = torch.cat(obs, axis=-1)  # Shape: (num_envs, num_obs)
 
-        # self.obs_buf = torch.cat(
-        #     [
-        #         self.base_lin_vel * self.obs_scales["lin_vel"],  # 3, the robot's linear velocity in its base frame(3d)
-        #         self.base_ang_vel * self.obs_scales["ang_vel"],  # 3, the robot's angular velocity in its base frame(3d)
-        #         self.projected_gravity,  # 3, gravity vector in the robot's base frame, indicating its orientation
-        #         (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],  # 12, current joint angles relative to default
-        #         self.dof_vel * self.obs_scales["dof_vel"],  # 12, current joint velocities 
-        #         self.actions,  # 12 # current actions issued by the policy
-        #         self.base_pos - self.last_base_pos,  # 3, difference between previous and current base position 
-        #         # self.relative_heights,  # 25, height field patch in front of the robot
-        #     ],
-        #     axis=-1,
-        # )
 
         # clip observations to prevent extreme values
         clip_obs = 100.0
@@ -517,22 +504,7 @@ class Go2Env:
                 privileged_obs.append(self.relative_heights)
    
             self.privileged_obs_buf = torch.cat(privileged_obs, axis=-1)
-
-            # self.privileged_obs_buf = torch.cat(
-            #     [
-            #         self.base_lin_vel * self.obs_scales['lin_vel'],                     # 3
-            #         self.base_ang_vel * self.obs_scales['ang_vel'],                     # 3
-            #         self.projected_gravity,                                             # 3
-            #         (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'], # 12, current joint angles relative to default
-            #         self.dof_vel * self.obs_scales['dof_vel'],  # 12, current joint velocities
-            #         self.last_dof_vel * self.obs_scales['dof_vel'],  # 12, previous joint velocities
-            #         self.actions, # 12, current actions issued by the policy
-            #         self.last_actions, # 12, previous actions
-            #         self.base_pos - self.last_base_pos, # 3, difference between previous and current base position
-            #         # self.relative_heights,  # 25, height field patch in front of the robot
-            #     ],
-            #     axis=-1,
-            # )
+            
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
     def get_observations(self):
