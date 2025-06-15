@@ -1,0 +1,56 @@
+{
+  "os": "Linux-5.15.0-141-generic-x86_64-with-glibc2.35",
+  "python": "CPython 3.11.11",
+  "startedAt": "2025-06-15T18:40:29.353654Z",
+  "args": [
+    "-e",
+    "tesuto",
+    "-B",
+    "1",
+    "--max_iterations",
+    "1"
+  ],
+  "program": "/home/egoekcek/GenesisLocomotionPolicies/Flips/train_frontflip.py",
+  "codePath": "Flips/train_frontflip.py",
+  "git": {
+    "remote": "https://github.com/ahemyu/GenesisLocomotionPolicies",
+    "commit": "e4296f053b749b3c9a287a6a2eeeba3467a23380"
+  },
+  "email": "hansovic7@gmail.com",
+  "root": "logs/tesuto",
+  "host": "sarmatia",
+  "executable": "/home/egoekcek/miniconda3/envs/genesis/bin/python",
+  "codePathLocal": "train_frontflip.py",
+  "cpu_count": 16,
+  "cpu_count_logical": 32,
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "gpu_count": 2,
+  "disk": {
+    "/": {
+      "total": "1965172678656",
+      "used": "1446288773120"
+    }
+  },
+  "memory": {
+    "total": "66578903040"
+  },
+  "cpu": {
+    "count": 16,
+    "countLogical": 32
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4090",
+      "memoryTotal": "25757220864",
+      "cudaCores": 16384,
+      "architecture": "Ada"
+    },
+    {
+      "name": "NVIDIA GeForce RTX 4090",
+      "memoryTotal": "25757220864",
+      "cudaCores": 16384,
+      "architecture": "Ada"
+    }
+  ],
+  "cudaVersion": "12.4"
+}

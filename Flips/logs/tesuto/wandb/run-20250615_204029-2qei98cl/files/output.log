@@ -1,0 +1,38 @@
+/home/egoekcek/GenesisLocomotionPolicies/Flips/locomotion_env.py:428: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  self.link_contact_forces[:] = torch.tensor(
+Traceback (most recent call last):
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/train_frontflip.py", line 244, in <module>
+    main()
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/train_frontflip.py", line 240, in main
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/rsl_rl/runners/on_policy_runner.py", line 116, in learn
+    actions = self.alg.act(obs, critic_obs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/rsl_rl/algorithms/ppo.py", line 65, in act
+    self.transition.actions = self.actor_critic.act(obs).detach()
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/rsl_rl/modules/actor_critic.py", line 125, in act
+    return self.distribution.sample()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/egoekcek/miniconda3/envs/genesis/lib/python3.11/site-packages/torch/distributions/normal.py", line 73, in sample
+    return torch.normal(self.loc.expand(shape), self.scale.expand(shape))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/train_frontflip.py", line 244, in <module>
+    main()
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/train_frontflip.py", line 240, in main
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/rsl_rl/runners/on_policy_runner.py", line 116, in learn
+    actions = self.alg.act(obs, critic_obs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/rsl_rl/algorithms/ppo.py", line 65, in act
+    self.transition.actions = self.actor_critic.act(obs).detach()
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/egoekcek/GenesisLocomotionPolicies/Flips/rsl_rl/modules/actor_critic.py", line 125, in act
+    return self.distribution.sample()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/egoekcek/miniconda3/envs/genesis/lib/python3.11/site-packages/torch/distributions/normal.py", line 73, in sample
+    return torch.normal(self.loc.expand(shape), self.scale.expand(shape))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

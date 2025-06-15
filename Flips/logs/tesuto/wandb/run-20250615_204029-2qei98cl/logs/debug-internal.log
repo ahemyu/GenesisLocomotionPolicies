@@ -1,0 +1,15 @@
+{"time":"2025-06-15T20:40:29.356012164+02:00","level":"INFO","msg":"stream: starting","core version":"0.19.9","symlink path":"logs/tesuto/wandb/run-20250615_204029-2qei98cl/logs/debug-core.log"}
+{"time":"2025-06-15T20:40:29.634185191+02:00","level":"INFO","msg":"created new stream","id":"2qei98cl"}
+{"time":"2025-06-15T20:40:29.634219214+02:00","level":"INFO","msg":"stream: started","id":"2qei98cl"}
+{"time":"2025-06-15T20:40:29.634237839+02:00","level":"INFO","msg":"writer: Do: started","stream_id":"2qei98cl"}
+{"time":"2025-06-15T20:40:29.634258237+02:00","level":"INFO","msg":"handler: started","stream_id":"2qei98cl"}
+{"time":"2025-06-15T20:40:29.634280158+02:00","level":"INFO","msg":"sender: started","stream_id":"2qei98cl"}
+{"time":"2025-06-15T20:40:29.837221617+02:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-06-15T20:40:31.330428606+02:00","level":"INFO","msg":"stream: closing","id":"2qei98cl"}
+{"time":"2025-06-15T20:40:31.330448944+02:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-06-15T20:40:31.330490271+02:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-06-15T20:40:31.890192417+02:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-06-15T20:40:32.064849618+02:00","level":"INFO","msg":"handler: closed","stream_id":"2qei98cl"}
+{"time":"2025-06-15T20:40:32.06488798+02:00","level":"INFO","msg":"writer: Close: closed","stream_id":"2qei98cl"}
+{"time":"2025-06-15T20:40:32.064917184+02:00","level":"INFO","msg":"sender: closed","stream_id":"2qei98cl"}
+{"time":"2025-06-15T20:40:32.064941279+02:00","level":"INFO","msg":"stream: closed","id":"2qei98cl"}
