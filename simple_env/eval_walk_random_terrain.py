@@ -19,7 +19,9 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
     reward_cfg["reward_scales"] = {}
     env_cfg["terrain_cfg"]["randomize"]=False
-
+    # Here you can modify the terrain configuration to test different terrains
+    # env_cfg["terrain_cfg"]["n_subterrains"] = (4, 1) 
+    # env_cfg["terrain_cfg"]["subterrain_types"] = [["wave_terrain"], ["pyramid_sloped_terrain"], ["pyramid_stairs_terrain"], ["stairs_terrain"]]
     env = WalkRandomTerrain(
         num_envs=1,
         env_cfg=env_cfg,
@@ -47,10 +49,10 @@ def main():
             obs, _, rews, dones, infos = env.step(actions)
             n_frames += 1
             if args.record:
-                if n_frames == 1500:
+                if n_frames == 2000:
                     env.stop_recording(
-                        f"{args.exp_name}_{args.ckpt}_behind_view.mp4",
-                        f"{args.exp_name}_{args.ckpt}_side_view.mp4"
+                        f"{args.exp_name}_{args.ckpt}_different_terrains_behind_view.mp4",
+                        f"{args.exp_name}_{args.ckpt}_different_terrains_side_view.mp4"
                     )
                     exit()
 

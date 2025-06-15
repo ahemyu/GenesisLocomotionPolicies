@@ -11,25 +11,25 @@ import genesis as gs
 import random
 
 
-def create_random_terrains(seed: int = 42):
-    """Create a 5x5 terrain configuration with reproducible randomization."""
-    random.seed(seed)
-    terrain = [["fractal_terrain", "fractal_terrain", "fractal_terrain"]]
+# def create_random_terrains(seed: int = 42):
+#     """Create a 5x5 terrain configuration with reproducible randomization."""
+#     random.seed(seed)
+#     terrain = [["fractal_terrain", "fractal_terrain", "fractal_terrain"]]
 
-    all_terrains = [
-        "wave_terrain",
-        # "fractal_terrain",
-        "pyramid_sloped_terrain",
-        "pyramid_stairs_terrain",
-        "flat_terrain"
-    ]
+#     all_terrains = [
+#         "wave_terrain",
+#         # "fractal_terrain",
+#         "pyramid_sloped_terrain",
+#         "pyramid_stairs_terrain",
+#         "flat_terrain"
+#     ]
     
-    for _ in range(2):
-        shuffled_terrains = all_terrains.copy()
-        random.shuffle(shuffled_terrains)
-        terrain.append(shuffled_terrains[:3]) # take the first 3 terrains from the shuffled list
+#     for _ in range(2):
+#         shuffled_terrains = all_terrains.copy()
+#         random.shuffle(shuffled_terrains)
+#         terrain.append(shuffled_terrains[:3]) # take the first 3 terrains from the shuffled list
 
-    return terrain
+#     return terrain
 
 def get_train_cfg(exp_name, max_iterations):
 
@@ -123,14 +123,14 @@ def get_cfgs():
         "termination_if_pitch_greater_than": 30,  # degree
         # base pose
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
-        "episode_length_s": 30.0,
-        # "resampling_time_s": 4.0, used for resampling commands and domain randomization
+        "episode_length_s":40.0,
+        # "resampling_time_s": 4.0, used for resampling commands and dynamics randomization
         "action_scale": 0.25, # this is smth like the amplitude knob that converts the policy's dimesionless output into real angles
         "simulate_action_latency": True,
         "clip_actions": 100.0, # self.actions = torch.clip(actions, -clip_actions, clip_actions), so it prevents the actions from going outside the range of -100 to 100 (which is too high)
         'use_terrain': True,
         'terrain_cfg': {
-            'subterrain_types': 'fractal_terrain', #create_random_terrains(), # create_random_terrains(),  # 5x5 grid of random subterrain types that each start with flat terrain
+            'subterrain_types': 'fractal_terrain', #create_random_terrains(), # 5x5 grid of random subterrain types that each start with flat terrain
             'n_subterrains': (3, 1),
             'subterrain_size': (12.0, 12.0),
             'horizontal_scale': 0.25, # determines the number of scales per tile, so here 12/0.25 = 48 per tile

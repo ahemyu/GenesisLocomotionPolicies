@@ -1,7 +1,4 @@
-import numpy as np
 import torch
-
-import genesis as gs
 from locomotion_env import *
 
 class Go2(LocoEnv):
@@ -281,7 +278,6 @@ class Backflip(Go2):
 
     def _reward_collision(self):
         # Penalize collisions on selected bodies
-        current_time = self.episode_length_buf * self.dt
         return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1)
 
 class FrontFlip(Go2):
@@ -404,7 +400,7 @@ class FrontFlip(Go2):
         and return to the initial upright orientation, ensuring a controlled flip and stable landing preparation."""
         current_time = self.episode_length_buf * self.dt
         phase = (current_time - 0.5).clamp(min=0, max=0.5)
-        quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi, #TODO; test if reverting this changes anything
+        quat_pitch = gs_quat_from_angle_axis(-4 * phase * torch.pi,
                                              torch.tensor([0, 1, 0], device=self.device, dtype=torch.float))
 
         desired_base_quat = gs_quat_mul(quat_pitch, self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1))
@@ -468,7 +464,6 @@ class FrontFlip(Go2):
         """Penalizes deviation of feet y-positions from desired stance width (0.3m).
         
         Maintains a stable and wide stance before and after the flip, aiding balance and proper leg positioning."""
-        current_time = self.episode_length_buf * self.dt
         cur_footsteps_translated = self.foot_positions - self.base_pos.unsqueeze(1)
         footsteps_in_body_frame = torch.zeros(self.num_envs, 4, 3, device=self.device)
         for i in range(4):
@@ -495,16 +490,4 @@ class FrontFlip(Go2):
         Prevents the robot from crashing or landing on its base/body, encouraging a clean flip and feet-first landing."""
         current_time = self.episode_length_buf * self.dt
         return (1.0 * (torch.norm(self.link_contact_forces[:, self.penalized_contact_link_indices, :], dim=-1) > 0.1)).sum(dim=1) 
-
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-class WalkUneven(Go2):
-    """
-    Environment for training the Go2 robot to walk on uneven pyramid stairs terrain.
-    Focuses on teaching the robot to elegantly navigate both ascending and descending stairs.
-    """
-    pass
+    
